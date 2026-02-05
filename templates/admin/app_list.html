@@ -1,0 +1,86 @@
+{% load i18n %}
+
+{% if app_list %}
+  <div class="app-list">
+    {% for app in app_list %}
+      {% if app.app_label == "handoff" %}
+        <div class="app-handoff">
+          <div class="app-title">{{ app.name }}</div>
+
+          <div class="handoff-group">
+            <div class="handoff-group-title">Workflow</div>
+            <ul class="handoff-list">
+              {% for model in app.models %}
+                {% if model.object_name|lower in "task,recurringtask,taskstep" %}
+                  <li class="handoff-item">
+                    <a href="{{ model.admin_url }}">{{ model.name }}</a>
+                    {% if model.add_url %}<a class="addlink" href="{{ model.add_url }}">Add</a>{% endif %}
+                  </li>
+                {% endif %}
+              {% endfor %}
+            </ul>
+          </div>
+
+          <div class="handoff-group">
+            <div class="handoff-group-title">Templates</div>
+            <ul class="handoff-list">
+              {% for model in app.models %}
+                {% if model.object_name|lower in "tasktemplate,mockuptemplate" %}
+                  <li class="handoff-item">
+                    <a href="{{ model.admin_url }}">{{ model.name }}</a>
+                    {% if model.add_url %}<a class="addlink" href="{{ model.add_url }}">Add</a>{% endif %}
+                  </li>
+                {% endif %}
+              {% endfor %}
+            </ul>
+          </div>
+
+          <div class="handoff-group">
+            <div class="handoff-group-title">Files</div>
+            <ul class="handoff-list">
+              {% for model in app.models %}
+                {% if model.object_name|lower in "attachment" %}
+                  <li class="handoff-item">
+                    <a href="{{ model.admin_url }}">{{ model.name }}</a>
+                    {% if model.add_url %}<a class="addlink" href="{{ model.add_url }}">Add</a>{% endif %}
+                  </li>
+                {% endif %}
+              {% endfor %}
+            </ul>
+          </div>
+
+          <div class="handoff-group">
+            <div class="handoff-group-title">System</div>
+            <ul class="handoff-list">
+              <li class="handoff-item">
+                <a href="/admin/handoff/schedule/">Design Schedule</a>
+              </li>
+              {% for model in app.models %}
+                {% if model.object_name|lower in "appsettings" %}
+                  <li class="handoff-item">
+                    <a href="{{ model.admin_url }}">{{ model.name }}</a>
+                    {% if model.add_url %}<a class="addlink" href="{{ model.add_url }}">Add</a>{% endif %}
+                  </li>
+                {% endif %}
+              {% endfor %}
+            </ul>
+          </div>
+        </div>
+      {% else %}
+        <div class="app-default">
+          <div class="app-title">{{ app.name }}</div>
+          <ul class="handoff-list">
+            {% for model in app.models %}
+              <li class="handoff-item">
+                <a href="{{ model.admin_url }}">{{ model.name }}</a>
+                {% if model.add_url %}<a class="addlink" href="{{ model.add_url }}">Add</a>{% endif %}
+              </li>
+            {% endfor %}
+          </ul>
+        </div>
+      {% endif %}
+    {% endfor %}
+  </div>
+{% else %}
+  <p>{% translate "You don’t have permission to view or edit anything." %}</p>
+{% endif %}

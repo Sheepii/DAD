@@ -1,0 +1,46 @@
+{% load handoff_extras %}
+<div id="mockups-panel">
+  <h5 class="card-title">Mockups</h5>
+  <div class="text-muted small mb-2">
+    Drag new mockups onto a slot to replace placeholders.
+  </div>
+  <div class="d-flex gap-2 flex-wrap mb-3">
+    <button class="btn btn-success btn-sm" type="button" id="choose-mockup-folder">
+      Choose Save Folder
+    </button>
+    <button class="btn btn-outline-primary btn-sm" type="button" id="save-all-mockups">
+      Save All Mockups
+    </button>
+    {% if mockups_folder_id %}
+      <a
+        class="btn btn-outline-secondary btn-sm"
+        href="https://drive.google.com/drive/folders/{{ mockups_folder_id }}"
+        target="_blank"
+        rel="noopener"
+      >
+        Open Mockups Folder
+      </a>
+    {% endif %}
+  </div>
+  <div id="mockup-save-status" class="mb-3 d-none">
+    <div class="small text-muted mb-1" id="mockup-save-text">Preparing downloads...</div>
+    <div class="progress" style="height: 8px;">
+      <div
+        id="mockup-save-bar"
+        class="progress-bar"
+        role="progressbar"
+        style="width: 0%;"
+        aria-valuenow="0"
+        aria-valuemin="0"
+        aria-valuemax="100"
+      ></div>
+    </div>
+  </div>
+  <div class="row g-2">
+    {% for slot in task.mockup_slots.all %}
+      <div class="col-6">
+        {% include "handoff/_mockup_slot.html" with slot=slot fallback_image_id=slot_images|get_item:slot.order required_orders=required_orders %}
+      </div>
+    {% endfor %}
+  </div>
+</div>

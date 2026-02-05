@@ -1,0 +1,368 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{% block title %}DAD{% endblock %}</title>
+    <link
+      href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css"
+      rel="stylesheet"
+    />
+    <script src="https://unpkg.com/htmx.org@1.9.12"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+  </head>
+  <body class="bg-light">
+    <style>
+      @media (max-width: 991.98px) {
+        .checklist-lg .form-check-input {
+          width: 1.5rem;
+          height: 1.5rem;
+        }
+
+        .checklist-lg .form-check-label {
+          font-size: 1.05rem;
+        }
+      }
+
+      .mockup-slot {
+        cursor: pointer;
+        transition: box-shadow 0.15s ease, border-color 0.15s ease;
+      }
+
+      .mockup-slot.mockup-required {
+        border-color: #f0ad4e;
+      }
+
+      .mockup-slot.is-filled {
+        border-color: #198754;
+        box-shadow: 0 0 0 2px rgba(25, 135, 84, 0.25);
+      }
+
+      .mockup-slot.dragover {
+        border-color: #198754;
+        box-shadow: 0 0 0 3px rgba(25, 135, 84, 0.35);
+      }
+
+      .design-drop.dragover {
+        border-color: #0d6efd;
+        box-shadow: 0 0 0 3px rgba(13, 110, 253, 0.25);
+      }
+
+      .is-next {
+        border-color: #0d6efd;
+        background: rgba(13, 110, 253, 0.08);
+      }
+
+      .is-done {
+        opacity: 0.6;
+      }
+    </style>
+    <nav class="navbar navbar-expand-lg bg-white border-bottom">
+      <div class="container">
+        <a class="navbar-brand fw-bold" href="{% url 'handoff:today' %}">
+          DAD - Design A Day
+        </a>
+        <div class="d-flex gap-2">
+          <a class="btn btn-outline-primary btn-sm" href="{% url 'handoff:summary' %}">
+            Summary
+          </a>
+          <a class="btn btn-primary btn-sm" href="{% url 'handoff:create_task' %}">
+            New Task
+          </a>
+          <a class="btn btn-outline-secondary btn-sm" href="/admin/">Admin</a>
+        </div>
+      </div>
+    </nav>
+
+    <main class="container py-4">
+      <div id="csrf-token" class="d-none">{% csrf_token %}</div>
+      {% if messages %}
+        {% for message in messages %}
+          <div class="alert alert-{% if message.tags == 'error' %}danger{% else %}{{ message.tags }}{% endif %}">
+            {{ message }}
+          </div>
+        {% endfor %}
+      {% endif %}
+      {% block content %}{% endblock %}
+    </main>
+
+    <script>
+      document.body.addEventListener("htmx:configRequest", (event) => {
+        const token = document.querySelector(
+          'input[name="csrfmiddlewaretoken"]'
+        );
+        if (token) {
+          event.detail.headers["X-CSRFToken"] = token.value;
+        }
+      });
+    </script>
+
+    <script>
+      function bindMockupSlots() {
+        document.querySelectorAll(".mockup-slot").forEach((slot) => {
+          const input = slot.querySelector(".mockup-input");
+          if (!input) return;
+
+          const upload = (file) => {
+            if (!file) return;
+            const slotId = slot.dataset.slotId;
+            const formData = new FormData();
+            formData.append("mockup_file", file);
+            const csrf = document.querySelector('input[name="csrfmiddlewaretoken"]');
+            fetch(`/mockup/${slotId}/upload/`, {
+              method: "POST",
+              headers: csrf ? { "X-CSRFToken": csrf.value } : {},
+              body: formData,
+            })
+              .then((response) => response.text())
+              .then((html) => {
+                slot.outerHTML = html;
+                bindMockupSlots();
+                const stepsPanel = document.getElementById("steps-panel");
+                if (stepsPanel) {
+                  const taskId = stepsPanel.dataset.taskId;
+                  fetch(`/task/${taskId}/steps/`)
+                    .then((response) => response.text())
+                    .then((stepsHtml) => {
+                      stepsPanel.innerHTML = stepsHtml;
+                    });
+                  fetch(`/task/${taskId}/mockups/`)
+                    .then((response) => response.text())
+                    .then((mockupsHtml) => {
+                      const panel = document.getElementById("mockups-panel");
+                      if (panel) {
+                        panel.outerHTML = mockupsHtml;
+                        bindMockupSlots();
+                      }
+                    });
+                }
+              });
+          };
+
+          slot.addEventListener("click", () => input.click());
+          input.addEventListener("change", (event) => {
+            upload(event.target.files[0]);
+          });
+          slot.addEventListener("dragover", (event) => {
+            event.preventDefault();
+            slot.classList.add("dragover");
+          });
+          slot.addEventListener("dragleave", () => {
+            slot.classList.remove("dragover");
+          });
+          slot.addEventListener("drop", (event) => {
+            event.preventDefault();
+            slot.classList.remove("dragover");
+            const file = event.dataTransfer.files[0];
+            upload(file);
+          });
+        });
+      }
+
+      document.addEventListener("DOMContentLoaded", bindMockupSlots);
+    </script>
+
+    <script>
+      document.addEventListener("DOMContentLoaded", () => {
+        const form = document.getElementById("design-upload-form");
+        if (!form) return;
+        const input = form.querySelector('input[type="file"]');
+        form.classList.add("design-drop");
+        const progress = document.getElementById("design-upload-progress");
+        const bar = progress ? progress.querySelector(".progress-bar") : null;
+        form.addEventListener("dragover", (event) => {
+          event.preventDefault();
+          form.classList.add("dragover");
+        });
+        form.addEventListener("dragleave", () => {
+          form.classList.remove("dragover");
+        });
+        form.addEventListener("drop", (event) => {
+          event.preventDefault();
+          form.classList.remove("dragover");
+          const file = event.dataTransfer.files[0];
+          if (!file) return;
+          input.files = event.dataTransfer.files;
+          submitWithProgress(form, progress, bar);
+        });
+        form.addEventListener("submit", (event) => {
+          event.preventDefault();
+          submitWithProgress(form, progress, bar);
+        });
+      });
+
+      function submitWithProgress(form, progress, bar) {
+        const fileInput = form.querySelector('input[type="file"]');
+        if (!fileInput || !fileInput.files.length) return;
+        const action = form.getAttribute("action");
+        const formData = new FormData(form);
+        if (progress) progress.classList.remove("d-none");
+        if (bar) bar.style.width = "0%";
+
+        const xhr = new XMLHttpRequest();
+        xhr.open("POST", action, true);
+        xhr.upload.onprogress = (event) => {
+          if (!event.lengthComputable) return;
+          const percent = Math.round((event.loaded / event.total) * 100);
+          if (bar) bar.style.width = percent + "%";
+        };
+        xhr.onload = () => {
+          if (progress) progress.classList.add("d-none");
+          if (xhr.status >= 200 && xhr.status < 400) {
+            window.location.reload();
+          } else {
+            const message = xhr.responseText ? `Upload failed: ${xhr.responseText}` : "Upload failed. Please try again.";
+            alert(message);
+          }
+        };
+        xhr.onerror = () => {
+          if (progress) progress.classList.add("d-none");
+          alert("Upload failed. Please try again.");
+        };
+        xhr.send(formData);
+      }
+    </script>
+
+    <script>
+      document.addEventListener("DOMContentLoaded", () => {
+        const toggle = document.getElementById("toggle-completed-steps");
+        const list = document.getElementById("checklist-items");
+        if (!toggle || !list) return;
+        let hidden = false;
+        toggle.addEventListener("click", () => {
+          hidden = !hidden;
+          list.querySelectorAll(".is-done").forEach((item) => {
+            item.style.display = hidden ? "none" : "flex";
+          });
+          toggle.textContent = hidden ? "Show completed" : "Hide completed";
+        });
+        const next = list.querySelector(".is-next");
+        if (next) {
+          next.scrollIntoView({ behavior: "smooth", block: "center" });
+        }
+      });
+    </script>
+
+    <script>
+      async function getStoredHandle() {
+        if (!("indexedDB" in window)) return null;
+        return new Promise((resolve) => {
+          const request = indexedDB.open("dad_mockup_handles", 1);
+          request.onupgradeneeded = () => {
+            const db = request.result;
+            db.createObjectStore("handles");
+          };
+          request.onsuccess = () => {
+            const db = request.result;
+            const tx = db.transaction("handles", "readonly");
+            const store = tx.objectStore("handles");
+            const getReq = store.get("mockup_folder");
+            getReq.onsuccess = () => resolve(getReq.result || null);
+            getReq.onerror = () => resolve(null);
+          };
+          request.onerror = () => resolve(null);
+        });
+      }
+
+      async function saveHandle(handle) {
+        if (!("indexedDB" in window)) return;
+        const request = indexedDB.open("dad_mockup_handles", 1);
+        request.onupgradeneeded = () => {
+          const db = request.result;
+          db.createObjectStore("handles");
+        };
+        request.onsuccess = () => {
+          const db = request.result;
+          const tx = db.transaction("handles", "readwrite");
+          const store = tx.objectStore("handles");
+          store.put(handle, "mockup_folder");
+        };
+      }
+
+      async function pickFolder() {
+        if (!window.showDirectoryPicker) {
+          alert("Folder picker not supported in this browser. Use Chrome or Edge.");
+          return null;
+        }
+        const handle = await window.showDirectoryPicker();
+        await saveHandle(handle);
+        return handle;
+      }
+
+      async function ensureFolderHandle() {
+        let handle = await getStoredHandle();
+        if (handle) {
+          const perm = await handle.queryPermission({ mode: "readwrite" });
+          if (perm === "granted") return handle;
+        }
+        return await pickFolder();
+      }
+
+      async function saveAllMockups(taskId, statusEl, barEl, textEl, saveBtn) {
+        const handle = await ensureFolderHandle();
+        if (!handle) return;
+        if (statusEl) statusEl.classList.remove("d-none");
+        if (barEl) {
+          barEl.style.width = "0%";
+          barEl.setAttribute("aria-valuenow", "0");
+        }
+        if (textEl) textEl.textContent = "Fetching list...";
+        if (saveBtn) saveBtn.disabled = true;
+
+        try {
+          const filesResp = await fetch(`/task/${taskId}/mockups/files/`);
+          const payload = await filesResp.json();
+          const total = payload.files ? payload.files.length : 0;
+          if (!total) {
+            if (textEl) textEl.textContent = "No mockups to save.";
+            if (barEl) {
+              barEl.style.width = "100%";
+              barEl.setAttribute("aria-valuenow", "100");
+            }
+            return;
+          }
+          let done = 0;
+          for (const file of payload.files) {
+            if (textEl) textEl.textContent = `Saving ${done + 1} of ${total}...`;
+            const res = await fetch(`/mockup/file/${file.file_id}/download/`);
+            const blob = await res.blob();
+            const fileHandle = await handle.getFileHandle(file.filename, { create: true });
+            const writable = await fileHandle.createWritable();
+            await writable.write(blob);
+            await writable.close();
+            done += 1;
+            const percent = Math.round((done / total) * 100);
+            if (barEl) {
+              barEl.style.width = percent + "%";
+              barEl.setAttribute("aria-valuenow", String(percent));
+            }
+          }
+          if (textEl) textEl.textContent = "All mockups saved.";
+        } catch (err) {
+          if (textEl) textEl.textContent = "Save failed. Please try again.";
+        } finally {
+          if (saveBtn) saveBtn.disabled = false;
+        }
+      }
+
+      document.addEventListener("DOMContentLoaded", () => {
+        const chooseBtn = document.getElementById("choose-mockup-folder");
+        const saveBtn = document.getElementById("save-all-mockups");
+        const statusEl = document.getElementById("mockup-save-status");
+        const barEl = document.getElementById("mockup-save-bar");
+        const textEl = document.getElementById("mockup-save-text");
+        if (!chooseBtn || !saveBtn) return;
+        const stepsPanel = document.getElementById("steps-panel");
+        const taskId = stepsPanel ? stepsPanel.dataset.taskId : null;
+        chooseBtn.addEventListener("click", async () => {
+          await pickFolder();
+        });
+        saveBtn.addEventListener("click", async () => {
+          if (!taskId) return;
+          await saveAllMockups(taskId, statusEl, barEl, textEl, saveBtn);
+        });
+      });
+    </script>
+
+  </body>
+</html>

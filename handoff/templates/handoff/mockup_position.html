@@ -1,0 +1,316 @@
+{% extends "handoff/base.html" %}
+
+{% block title %}Position Design{% endblock %}
+
+{% block content %}
+  <h1 class="h4 mb-3">Position Design - Slide {{ template.order }}</h1>
+  <div class="text-muted mb-3">Drag and resize the design box. Save when done.</div>
+
+  <div class="row g-3">
+    <div class="col-12 col-lg-8">
+      <div class="position-relative border bg-black" style="width: 600px; height: 600px;">
+        <img
+          id="layer-background"
+          src="{% url 'handoff:mockup_template_asset' template.id 'background' %}?size=600"
+          alt="Background"
+          style="position:absolute; top:0; left:0; width:100%; height:100%; object-fit:cover;"
+        />
+        <img
+          id="layer-overlay"
+          src="{% url 'handoff:mockup_template_asset' template.id 'overlay' %}?size=600"
+          alt="Overlay"
+          style="position:absolute; top:0; left:0; width:100%; height:100%; object-fit:cover; pointer-events:none;"
+        />
+        <div id="design-ghosts"></div>
+        <img
+          id="design-image"
+          src="{% url 'handoff:mockup_template_asset' template.id 'design' %}?size=600"
+          alt="Design"
+          style="position:absolute; left:0; top:0; width:100%; height:100%; object-fit:contain; opacity:0.9; pointer-events:none;"
+        />
+        <div
+          id="design-box"
+          style="position:absolute; border:2px solid #00e676; box-shadow:0 0 0 2px rgba(0,0,0,0.6) inset; cursor:move;"
+        >
+          <div id="resize-handle" style="position:absolute; right:-8px; bottom:-8px; width:16px; height:16px; background:#00e676; cursor:nwse-resize;"></div>
+        </div>
+      </div>
+    </div>
+    <div class="col-12 col-lg-4">
+      <div class="card shadow-sm">
+        <div class="card-body">
+          <h6 class="card-title">Layers</h6>
+          <div class="form-check mb-2">
+            <input class="form-check-input" type="checkbox" id="toggle-background" checked />
+            <label class="form-check-label" for="toggle-background">Background</label>
+          </div>
+          <div class="form-check mb-2">
+            <input class="form-check-input" type="checkbox" id="toggle-design" checked />
+            <label class="form-check-label" for="toggle-design">Design</label>
+          </div>
+          <div class="form-check mb-3">
+            <input class="form-check-input" type="checkbox" id="toggle-overlay" checked />
+            <label class="form-check-label" for="toggle-overlay">Overlay</label>
+          </div>
+          <div class="form-check mb-3">
+            <input class="form-check-input" type="checkbox" id="toggle-box" checked />
+            <label class="form-check-label" for="toggle-box">Show design box</label>
+          </div>
+          <div class="form-check mb-3">
+            <input class="form-check-input" type="checkbox" id="toggle-ghosts" checked />
+            <label class="form-check-label" for="toggle-ghosts">Show other designs</label>
+          </div>
+          <label class="form-label">Overlay Position</label>
+          <select id="overlay-position" class="form-select">
+            <option value="OVER" {% if template.overlay_position == "OVER" %}selected{% endif %}>Above design</option>
+            <option value="UNDER" {% if template.overlay_position == "UNDER" %}selected{% endif %}>Below design</option>
+          </select>
+          <label class="form-label mt-3">Design Opacity</label>
+          <input type="range" id="design-opacity" min="20" max="100" value="80" class="form-range" />
+          <div class="text-muted small">Aspect ratio is locked while resizing.</div>
+          <hr />
+          <div class="d-flex justify-content-between align-items-center mb-2">
+            <strong>Design Boxes</strong>
+            <button class="btn btn-sm btn-outline-primary" type="button" id="add-box">Add box</button>
+          </div>
+          <div id="boxes-list"></div>
+          <label class="form-label mt-3">Rotation (degrees)</label>
+          <input type="range" id="design-rotation" min="-45" max="45" value="0" class="form-range" />
+          <div class="text-muted small">Rotation applies to the selected box.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <form method="post" action="{% url 'handoff:mockup_template_position_save' template.id %}" class="mt-3">
+    {% csrf_token %}
+    <input type="hidden" name="design_x" id="design_x" />
+    <input type="hidden" name="design_y" id="design_y" />
+    <input type="hidden" name="design_width" id="design_width" />
+    <input type="hidden" name="design_height" id="design_height" />
+    <input type="hidden" name="design_boxes" id="design_boxes" />
+    <input type="hidden" name="overlay_position" id="overlay_position" />
+    <button class="btn btn-primary" type="submit">Save Position</button>
+    <a class="btn btn-outline-secondary ms-2" href="/admin/handoff/mockuptemplate/{{ template.id }}/change/">Back</a>
+  </form>
+
+  <script>
+    const box = document.getElementById("design-box");
+    const handle = document.getElementById("resize-handle");
+    const stage = box.parentElement;
+    const scale = 4000 / 600;
+    let dragging = false;
+    let resizing = false;
+    let startX = 0;
+    let startY = 0;
+    let startW = 0;
+    let startH = 0;
+    let startLeft = 0;
+    let startTop = 0;
+
+    let boxes = [];
+    {% if design_boxes %}
+      boxes = [
+        {% for b in design_boxes %}
+          { x: {{ b.x }}, y: {{ b.y }}, w: {{ b.width }}, h: {{ b.height }}, r: {{ b.rotation }} },
+        {% endfor %}
+      ];
+    {% else %}
+      boxes = [{ x: {{ template.design_x }}, y: {{ template.design_y }}, w: {{ template.design_width }}, h: {{ template.design_height }}, r: 0 }];
+    {% endif %}
+
+    let activeIndex = 0;
+    const ratio = boxes[0].w / boxes[0].h;
+
+    function syncBox() {
+      const b = boxes[activeIndex];
+      box.style.left = (b.x / scale) + "px";
+      box.style.top = (b.y / scale) + "px";
+      box.style.width = (b.w / scale) + "px";
+      box.style.height = (b.h / scale) + "px";
+
+      const design = document.getElementById("design-image");
+      design.style.left = (b.x / scale) + "px";
+      design.style.top = (b.y / scale) + "px";
+      design.style.width = (b.w / scale) + "px";
+      design.style.height = (b.h / scale) + "px";
+      design.style.transform = `rotate(${b.r || 0}deg)`;
+
+      renderGhosts();
+    }
+
+    function syncInputs() {
+      const b = boxes[activeIndex];
+      document.getElementById("design_x").value = Math.round(b.x);
+      document.getElementById("design_y").value = Math.round(b.y);
+      document.getElementById("design_width").value = Math.round(b.w);
+      document.getElementById("design_height").value = Math.round(b.h);
+      document.getElementById("overlay_position").value = document.getElementById("overlay-position").value;
+      const serialized = boxes.map((bx) => `${Math.round(bx.x)},${Math.round(bx.y)},${Math.round(bx.w)},${Math.round(bx.h)},${(bx.r || 0).toFixed(2)}`).join(";");
+      document.getElementById("design_boxes").value = serialized;
+    }
+
+    syncBox();
+    syncInputs();
+
+    box.addEventListener("mousedown", (e) => {
+      if (e.target === handle) return;
+      dragging = true;
+      startX = e.clientX;
+      startY = e.clientY;
+      const b = boxes[activeIndex];
+      startLeft = b.x;
+      startTop = b.y;
+    });
+
+    handle.addEventListener("mousedown", (e) => {
+      resizing = true;
+      startX = e.clientX;
+      startY = e.clientY;
+      const b = boxes[activeIndex];
+      startW = b.w;
+      startH = b.h;
+      e.stopPropagation();
+    });
+
+    window.addEventListener("mousemove", (e) => {
+      if (dragging) {
+        const dx = (e.clientX - startX) * scale;
+        const dy = (e.clientY - startY) * scale;
+        const b = boxes[activeIndex];
+        b.x = Math.max(0, Math.min(4000 - b.w, startLeft + dx));
+        b.y = Math.max(0, Math.min(4000 - b.h, startTop + dy));
+        syncBox();
+        syncInputs();
+      } else if (resizing) {
+        const dx = (e.clientX - startX) * scale;
+        const dy = (e.clientY - startY) * scale;
+        const useWidth = Math.abs(dx) >= Math.abs(dy);
+        const b = boxes[activeIndex];
+        if (useWidth) {
+          b.w = Math.max(50, Math.min(4000 - b.x, startW + dx));
+          b.h = Math.max(50, Math.min(4000 - b.y, b.w / ratio));
+        } else {
+          b.h = Math.max(50, Math.min(4000 - b.y, startH + dy));
+          b.w = Math.max(50, Math.min(4000 - b.x, b.h * ratio));
+        }
+        syncBox();
+        syncInputs();
+      }
+    });
+
+    window.addEventListener("mouseup", () => {
+      dragging = false;
+      resizing = false;
+    });
+
+    document.getElementById("toggle-background").addEventListener("change", (e) => {
+      document.getElementById("layer-background").style.display = e.target.checked ? "block" : "none";
+    });
+    document.getElementById("toggle-design").addEventListener("change", (e) => {
+      document.getElementById("design-image").style.display = e.target.checked ? "block" : "none";
+      box.style.display = e.target.checked ? "block" : "none";
+    });
+    document.getElementById("toggle-overlay").addEventListener("change", (e) => {
+      document.getElementById("layer-overlay").style.display = e.target.checked ? "block" : "none";
+    });
+    document.getElementById("toggle-box").addEventListener("change", (e) => {
+      box.style.display = e.target.checked ? "block" : "none";
+    });
+    document.getElementById("toggle-ghosts").addEventListener("change", (e) => {
+      document.getElementById("design-ghosts").style.display = e.target.checked ? "block" : "none";
+    });
+    document.getElementById("design-opacity").addEventListener("input", (e) => {
+      document.getElementById("design-image").style.opacity = (e.target.value / 100).toString();
+    });
+    document.getElementById("overlay-position").addEventListener("change", (e) => {
+      const overlay = document.getElementById("layer-overlay");
+      const design = document.getElementById("design-image");
+      if (e.target.value === "UNDER") {
+        overlay.style.zIndex = "1";
+        design.style.zIndex = "2";
+      } else {
+        overlay.style.zIndex = "3";
+        design.style.zIndex = "2";
+      }
+      syncInputs();
+    });
+
+    document.getElementById("overlay-position").dispatchEvent(new Event("change"));
+
+    const boxesContainer = document.getElementById("boxes-list");
+    const addBoxBtn = document.getElementById("add-box");
+    function renderBoxesList() {
+      boxesContainer.innerHTML = "";
+      boxes.forEach((b, idx) => {
+        const item = document.createElement("div");
+        item.className = "d-flex justify-content-between align-items-center mb-2";
+        const btn = document.createElement("button");
+        btn.type = "button";
+        btn.className = "btn btn-sm " + (idx === activeIndex ? "btn-primary" : "btn-outline-secondary");
+        btn.textContent = "Box " + (idx + 1);
+        btn.onclick = () => {
+          activeIndex = idx;
+          syncBox();
+          syncInputs();
+          document.getElementById("design-rotation").value = boxes[activeIndex].r || 0;
+          renderBoxesList();
+        };
+        const del = document.createElement("button");
+        del.type = "button";
+        del.className = "btn btn-sm btn-outline-danger";
+        del.textContent = "Remove";
+        del.onclick = () => {
+          boxes.splice(idx, 1);
+          if (activeIndex >= boxes.length) activeIndex = Math.max(0, boxes.length - 1);
+          if (boxes.length === 0) {
+            boxes.push({ x: 0, y: 0, w: 4000, h: 4000 });
+            activeIndex = 0;
+          }
+          syncBox();
+          syncInputs();
+          renderBoxesList();
+        };
+        item.appendChild(btn);
+        item.appendChild(del);
+        boxesContainer.appendChild(item);
+      });
+    }
+
+    addBoxBtn.addEventListener("click", () => {
+      boxes.push({ x: 0, y: 0, w: 2000, h: 2000, r: 0 });
+      activeIndex = boxes.length - 1;
+      syncBox();
+      syncInputs();
+      document.getElementById("design-rotation").value = 0;
+      renderBoxesList();
+    });
+
+    renderBoxesList();
+
+    document.getElementById("design-rotation").addEventListener("input", (e) => {
+      boxes[activeIndex].r = parseFloat(e.target.value);
+      syncBox();
+      syncInputs();
+    });
+
+    function renderGhosts() {
+      const ghosts = document.getElementById("design-ghosts");
+      ghosts.innerHTML = "";
+      boxes.forEach((b, idx) => {
+        if (idx === activeIndex) return;
+        const img = document.createElement("img");
+        img.src = "{% url 'handoff:mockup_template_asset' template.id 'design' %}?size=600";
+        img.style.position = "absolute";
+        img.style.left = (b.x / scale) + "px";
+        img.style.top = (b.y / scale) + "px";
+        img.style.width = (b.w / scale) + "px";
+        img.style.height = (b.h / scale) + "px";
+        img.style.transform = `rotate(${b.r || 0}deg)`;
+        img.style.opacity = "0.5";
+        img.style.pointerEvents = "none";
+        ghosts.appendChild(img);
+      });
+    }
+  </script>
+{% endblock %}

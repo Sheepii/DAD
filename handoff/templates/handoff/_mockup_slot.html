@@ -1,0 +1,70 @@
+{% load handoff_extras %}
+<div
+  class="mockup-slot border rounded p-2 text-center position-relative{% if required_orders|get_item:slot.order %} mockup-required{% endif %}{% if slot.drive_file_id %} is-filled{% endif %}"
+  data-slot-id="{{ slot.id }}"
+>
+  {% if slot.drive_file_id %}
+    <img
+      src="https://drive.google.com/thumbnail?id={{ slot.drive_file_id }}&sz=w300&t={{ slot.updated_at|date:'U' }}"
+      alt="Mockup {{ slot.order }}"
+      class="img-fluid rounded mb-2"
+      style="background: #000; object-fit: cover;"
+      loading="lazy"
+    />
+  {% elif fallback_image_id %}
+    <img
+      src="https://drive.google.com/thumbnail?id={{ fallback_image_id }}&sz=w300&t={{ slot.updated_at|date:'U' }}"
+      alt="Mockup {{ slot.order }}"
+      class="img-fluid rounded mb-2"
+      style="background: #000; object-fit: cover; opacity: 0.85;"
+      loading="lazy"
+    />
+  {% else %}
+    <div
+      class="d-flex align-items-center justify-content-center rounded mb-2"
+      style="width: 100%; aspect-ratio: 1 / 1; background: #000; color: #fff;"
+    >
+      Drop mockup
+    </div>
+  {% endif %}
+
+  <div class="small fw-semibold">
+    {% if slot.label %}
+      {{ slot.label }}
+    {% else %}
+      Mockup {{ slot.order }}
+    {% endif %}
+    {% if required_orders|get_item:slot.order %}
+      <span class="badge text-bg-warning ms-1">Required</span>
+    {% endif %}
+  </div>
+  {% if slot.filename %}
+    <div class="text-muted small">{{ slot.filename }}</div>
+  {% endif %}
+  {% if slot.drive_file_id %}
+    <div class="d-flex gap-2 mt-2">
+      <a
+        class="btn btn-sm btn-outline-secondary"
+        href="https://drive.google.com/file/d/{{ slot.drive_file_id }}/view"
+        target="_blank"
+        rel="noopener"
+      >
+        Open
+      </a>
+      <a
+        class="btn btn-sm btn-outline-primary"
+        href="https://drive.google.com/uc?export=download&id={{ slot.drive_file_id }}"
+      >
+        Download
+      </a>
+    </div>
+  {% endif %}
+  {% if required_orders|get_item:slot.order and not slot.drive_file_id %}
+    <div class="text-muted small">Needs replacement</div>
+  {% endif %}
+  {% if error %}
+    <div class="text-danger small mt-1">{{ error }}</div>
+  {% endif %}
+
+  <input type="file" class="d-none mockup-input" accept="image/*" />
+</div>

@@ -1,0 +1,432 @@
+{% extends "admin/base_site.html" %}
+{% load i18n %}
+
+{% block content %}
+  <style>
+    .schedule-toolbar {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+      align-items: center;
+      margin-bottom: 16px;
+    }
+    .schedule-grid {
+      display: grid;
+      grid-template-columns: repeat(7, minmax(140px, 1fr));
+      gap: 12px;
+    }
+    .schedule-cell {
+      border: 1px solid #2c2c2c;
+      border-radius: 10px;
+      padding: 10px;
+      min-height: 170px;
+      background: #1c1c1c;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    .schedule-cell.is-outside {
+      opacity: 0.35;
+    }
+    .schedule-date {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-weight: 600;
+    }
+    .schedule-items {
+      display: grid;
+      gap: 6px;
+    }
+    .schedule-upload {
+      margin-top: auto;
+    }
+    .schedule-upload .progress {
+      height: 6px;
+    }
+    .schedule-item {
+      display: grid;
+      grid-template-columns: 40px 1fr;
+      gap: 8px;
+      align-items: center;
+      background: #242424;
+      border-radius: 8px;
+      padding: 6px;
+      font-size: 12px;
+      color: #e2e2e2;
+    }
+    .schedule-thumb {
+      width: 40px;
+      height: 40px;
+      border-radius: 6px;
+      object-fit: cover;
+      background: #000;
+    }
+    .schedule-weekdays {
+      display: grid;
+      grid-template-columns: repeat(7, minmax(140px, 1fr));
+      gap: 12px;
+      margin-bottom: 12px;
+      font-weight: 600;
+      color: #cfcfcf;
+    }
+    .schedule-weekdays div {
+      text-align: center;
+    }
+  </style>
+
+  <div class="module">
+    <h1>Design Schedule</h1>
+    <div class="schedule-toolbar">
+      <a class="button" href="?month={{ prev_month }}{{ task_query }}">&#8592; Prev</a>
+      <strong>{{ month_label }}</strong>
+      <a class="button" href="?month={{ next_month }}{{ task_query }}">Next &#8594;</a>
+      <form method="get" style="margin-left:auto;display:flex;gap:8px;align-items:center;">
+        <input type="hidden" name="month" value="{{ month_value }}">
+        <label>Task</label>
+        <select name="task" onchange="this.form.submit()">
+          <option value="">All tasks</option>
+          {% for task in recurring_tasks %}
+            <option value="{{ task.id }}" {% if selected_task and task.id == selected_task.id %}selected{% endif %}>
+              {{ task.title }}
+            </option>
+          {% endfor %}
+        </select>
+      </form>
+    </div>
+
+    <div class="schedule-weekdays">
+      <div>Mon</div><div>Tue</div><div>Wed</div><div>Thu</div><div>Fri</div><div>Sat</div><div>Sun</div>
+    </div>
+    <div class="schedule-grid">
+      {% for week in weeks %}
+        {% for day in week %}
+          <div class="schedule-cell {% if not day.in_month %}is-outside{% endif %}" data-date="{{ day.date|date:'Y-m-d' }}">
+            <div class="schedule-date">
+              <a href="?month={{ month_value }}&date={{ day.date|date:'Y-m-d' }}{{ task_query }}">
+                {{ day.date|date:"j" }}
+              </a>
+              {% if day.scheduled_items %}
+                <span class="badge" style="background:#198754;color:white;">{{ day.scheduled_items|length }}</span>
+              {% endif %}
+            </div>
+            <div class="schedule-items">
+              {% for item in day.scheduled_items %}
+                <div
+                  class="schedule-item"
+                  data-schedule-id="{{ item.id }}"
+                  data-design-id="{{ item.design_id }}"
+                  data-task-id="{{ item.task_id }}"
+                  title="Double-click to edit"
+                >
+                  <img class="schedule-thumb" src="{{ item.thumb }}" alt="Design preview">
+                  <div>
+                    <div>{{ item.label }}</div>
+                    <div style="opacity:0.7;">Design set</div>
+                  </div>
+                </div>
+              {% endfor %}
+            </div>
+            <div class="schedule-upload d-none">
+              <div class="small schedule-upload-text">Uploading...</div>
+              <div class="progress">
+                <div class="progress-bar schedule-upload-bar" style="width:0%"></div>
+              </div>
+            </div>
+          </div>
+        {% endfor %}
+      {% endfor %}
+    </div>
+  </div>
+
+  <div class="module">
+    <h2>Set Design for {{ selected_date|date:"F j, Y" }}</h2>
+    <form method="post" enctype="multipart/form-data">
+      {% csrf_token %}
+      <input type="hidden" name="due_date" value="{{ selected_date|date:'Y-m-d' }}">
+      <div class="form-row">
+        <label>Task (optional)</label>
+        <select name="recurring_task_id">
+          <option value="">All tasks</option>
+          {% for task in recurring_tasks %}
+            <option value="{{ task.id }}" {% if selected_task and task.id == selected_task.id %}selected{% endif %}>
+              {{ task.title }}
+            </option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="form-row">
+        <label>Upload design from your PC</label>
+        <input type="file" name="design_upload" style="width:100%;" />
+      </div>
+      <div class="form-row">
+        <label>Or paste Drive file link/ID</label>
+        <input type="text" name="drive_design_file_id" style="width:100%;" value="{{ selected_design_id }}" />
+      </div>
+      <button class="button default" type="submit">Save</button>
+    </form>
+  </div>
+
+  <dialog id="schedule-dialog" style="border:none;border-radius:12px;max-width:520px;width:90%;">
+    <form method="post" enctype="multipart/form-data" id="schedule-dialog-form" style="display:grid;gap:12px;">
+      {% csrf_token %}
+      <input type="hidden" name="due_date" id="schedule-dialog-date">
+      <h2 style="margin:0;">Set Design</h2>
+      <div class="form-row">
+        <label>Date</label>
+        <input type="text" id="schedule-dialog-date-label" readonly>
+      </div>
+      <div class="form-row">
+        <label>Task (optional)</label>
+        <select name="recurring_task_id" id="schedule-dialog-task">
+          <option value="">All tasks</option>
+          {% for task in recurring_tasks %}
+            <option value="{{ task.id }}" {% if selected_task and task.id == selected_task.id %}selected{% endif %}>
+              {{ task.title }}
+            </option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="form-row">
+        <label>Upload design from your PC</label>
+        <input type="file" name="design_upload" style="width:100%;" />
+      </div>
+      <div class="form-row">
+        <label>Or paste Drive file link/ID</label>
+        <input type="text" name="drive_design_file_id" id="schedule-dialog-design-id" style="width:100%;" />
+      </div>
+      <div class="form-row d-none" id="schedule-dialog-existing">
+        <label>Current design</label>
+        <div style="display:flex;align-items:center;gap:12px;">
+          <img id="schedule-dialog-thumb" src="" alt="Current design" style="width:80px;height:80px;border-radius:8px;object-fit:cover;background:#000;border:1px solid #333;">
+          <div id="schedule-dialog-current-label" style="font-size:12px;color:#bdbdbd;">Existing design</div>
+        </div>
+      </div>
+      <div class="form-row">
+        <label style="display:flex;gap:8px;align-items:center;">
+          <input type="checkbox" name="remove_design" value="1" id="schedule-dialog-remove">
+          Remove design from this day
+        </label>
+      </div>
+      <div class="form-row d-none" id="schedule-dialog-progress">
+        <div class="small" id="schedule-dialog-progress-text">Uploading...</div>
+        <div class="progress" style="height:8px;">
+          <div class="progress-bar progress-bar-striped progress-bar-animated" id="schedule-dialog-progress-bar" style="width:0%"></div>
+        </div>
+      </div>
+      <div style="display:flex;gap:8px;justify-content:flex-end;">
+        <button type="button" class="button" id="schedule-dialog-cancel">Cancel</button>
+        <button class="button default" type="submit">Save</button>
+      </div>
+    </form>
+  </dialog>
+
+  <script>
+    document.addEventListener("DOMContentLoaded", () => {
+      const dialog = document.getElementById("schedule-dialog");
+      const dialogDate = document.getElementById("schedule-dialog-date");
+      const dialogDateLabel = document.getElementById("schedule-dialog-date-label");
+      const dialogTask = document.getElementById("schedule-dialog-task");
+      const dialogDesign = document.getElementById("schedule-dialog-design-id");
+      const dialogRemove = document.getElementById("schedule-dialog-remove");
+      const dialogExisting = document.getElementById("schedule-dialog-existing");
+      const dialogThumb = document.getElementById("schedule-dialog-thumb");
+      const dialogCurrentLabel = document.getElementById("schedule-dialog-current-label");
+      const dialogProgress = document.getElementById("schedule-dialog-progress");
+      const dialogProgressBar = document.getElementById("schedule-dialog-progress-bar");
+      const dialogProgressText = document.getElementById("schedule-dialog-progress-text");
+      const cancelBtn = document.getElementById("schedule-dialog-cancel");
+      const taskFilter = document.querySelector('select[name="task"]');
+      const taskFilterValue = taskFilter ? taskFilter.value : "";
+
+      const openDialogForCell = (cell, event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        const date = cell.dataset.date;
+        if (!date || !dialog) return;
+        dialogDate.value = date;
+        dialogDateLabel.value = date;
+        if (dialogTask && taskFilterValue) {
+          dialogTask.value = taskFilterValue;
+        }
+        if (dialogDesign) dialogDesign.value = "";
+        if (dialogRemove) dialogRemove.checked = false;
+        if (dialogExisting) dialogExisting.classList.add("d-none");
+        if (dialogThumb) dialogThumb.src = "";
+        if (dialogCurrentLabel) dialogCurrentLabel.textContent = "Existing design";
+        dialog.showModal();
+      };
+
+      document.querySelectorAll(".schedule-cell").forEach((cell) => {
+        cell.addEventListener("dblclick", (event) => openDialogForCell(cell, event));
+        const link = cell.querySelector("a");
+        if (link) {
+          link.addEventListener("dblclick", (event) => {
+            event.preventDefault();
+            event.stopPropagation();
+          });
+        }
+      });
+
+      if (cancelBtn && dialog) {
+        cancelBtn.addEventListener("click", () => dialog.close());
+      }
+
+      document.querySelectorAll(".schedule-item").forEach((item) => {
+        item.addEventListener("dblclick", (event) => {
+          event.preventDefault();
+          event.stopPropagation();
+          const id = item.dataset.scheduleId;
+          if (!id || !dialog) return;
+          const parentCell = item.closest(".schedule-cell");
+          const date = parentCell ? parentCell.dataset.date : "";
+          dialogDate.value = date;
+          dialogDateLabel.value = date;
+          if (dialogTask) {
+            dialogTask.value = item.dataset.taskId || "";
+          }
+          if (dialogDesign) {
+            dialogDesign.value = item.dataset.designId || "";
+          }
+          if (dialogRemove) dialogRemove.checked = false;
+          if (dialogExisting) dialogExisting.classList.remove("d-none");
+          if (dialogThumb) {
+            dialogThumb.src = `https://drive.google.com/thumbnail?id=${item.dataset.designId}&sz=w200`;
+          }
+          if (dialogCurrentLabel) dialogCurrentLabel.textContent = "Current design";
+          dialog.showModal();
+        });
+      });
+
+      const form = document.getElementById("schedule-dialog-form");
+      if (form) {
+        form.addEventListener("submit", (event) => {
+          event.preventDefault();
+          const date = dialogDate.value;
+          if (!date) return;
+          const cell = document.querySelector(`.schedule-cell[data-date="${date}"]`);
+          const uploadWrap = cell ? cell.querySelector(".schedule-upload") : null;
+          const uploadBar = cell ? cell.querySelector(".schedule-upload-bar") : null;
+          const uploadText = cell ? cell.querySelector(".schedule-upload-text") : null;
+          const formData = new FormData(form);
+          const xhr = new XMLHttpRequest();
+          if (dialogProgress) dialogProgress.classList.remove("d-none");
+          if (dialogProgressBar) dialogProgressBar.style.width = "0%";
+          if (dialogProgressText) dialogProgressText.textContent = "Uploading...";
+          if (uploadWrap) uploadWrap.classList.remove("d-none");
+          if (uploadBar) uploadBar.style.width = "0%";
+          if (uploadText) uploadText.textContent = "Uploading...";
+
+          xhr.open("POST", form.action || window.location.pathname, true);
+          xhr.setRequestHeader("X-Requested-With", "XMLHttpRequest");
+          xhr.upload.onprogress = (e) => {
+            if (!e.lengthComputable) return;
+            const percent = Math.round((e.loaded / e.total) * 100);
+            if (dialogProgressBar) dialogProgressBar.style.width = percent + "%";
+            if (uploadBar) uploadBar.style.width = percent + "%";
+          };
+          xhr.onload = () => {
+            if (xhr.status >= 200 && xhr.status < 300) {
+              try {
+                const payload = JSON.parse(xhr.responseText);
+                if (payload.status === "deleted") {
+                  removeScheduleItem(cell, payload.task_id);
+                } else if (payload.status === "saved") {
+                  upsertScheduleItem(cell, payload.item);
+                }
+              } catch (err) {
+                // fallback: reload if parsing fails
+                window.location.reload();
+                return;
+              }
+              if (dialog) dialog.close();
+            } else {
+              const msg = xhr.responseText ? `Upload failed: ${xhr.responseText}` : "Upload failed.";
+              if (dialogProgressText) dialogProgressText.textContent = msg;
+              if (uploadText) uploadText.textContent = msg;
+            }
+            if (dialogProgress) dialogProgress.classList.add("d-none");
+            if (uploadWrap) uploadWrap.classList.add("d-none");
+          };
+          xhr.onerror = () => {
+            if (dialogProgressText) dialogProgressText.textContent = "Upload failed.";
+            if (uploadText) uploadText.textContent = "Upload failed.";
+            if (dialogProgress) dialogProgress.classList.add("d-none");
+            if (uploadWrap) uploadWrap.classList.add("d-none");
+          };
+          xhr.send(formData);
+        });
+      }
+
+      function updateBadge(cell) {
+        if (!cell) return;
+        const count = cell.querySelectorAll(".schedule-item").length;
+        let badge = cell.querySelector(".schedule-date .badge");
+        if (count === 0 && badge) {
+          badge.remove();
+          return;
+        }
+        if (!badge && count > 0) {
+          badge = document.createElement("span");
+          badge.className = "badge";
+          badge.style.background = "#198754";
+          badge.style.color = "white";
+          cell.querySelector(".schedule-date").appendChild(badge);
+        }
+        if (badge) badge.textContent = String(count);
+      }
+
+      function upsertScheduleItem(cell, item) {
+        if (!cell || !item) return;
+        const itemsWrap = cell.querySelector(".schedule-items");
+        if (!itemsWrap) return;
+        const taskId = item.task_id || "";
+        let existing = itemsWrap.querySelector(`.schedule-item[data-task-id="${taskId}"]`);
+        if (!existing) {
+          existing = document.createElement("div");
+          existing.className = "schedule-item";
+          existing.dataset.taskId = taskId;
+          existing.dataset.scheduleId = item.id || "";
+          existing.dataset.designId = item.design_id || "";
+          existing.innerHTML =
+            `<img class="schedule-thumb" src="${item.thumb}" alt="Design preview">` +
+            `<div><div>${item.label}</div><div style="opacity:0.7;">Design set</div></div>`;
+          itemsWrap.appendChild(existing);
+          existing.addEventListener("dblclick", (event) => {
+            event.preventDefault();
+            event.stopPropagation();
+            if (!dialog) return;
+            const date = cell.dataset.date;
+            dialogDate.value = date;
+            dialogDateLabel.value = date;
+            if (dialogTask) dialogTask.value = taskId;
+            if (dialogDesign) dialogDesign.value = item.design_id || "";
+            if (dialogRemove) dialogRemove.checked = false;
+            if (dialogExisting) dialogExisting.classList.remove("d-none");
+            if (dialogThumb) dialogThumb.src = item.thumb;
+            if (dialogCurrentLabel) dialogCurrentLabel.textContent = "Current design";
+            dialog.showModal();
+          });
+        } else {
+          existing.dataset.scheduleId = item.id || "";
+          existing.dataset.designId = item.design_id || "";
+          const img = existing.querySelector("img");
+          if (img) img.src = item.thumb;
+          const label = existing.querySelector("div div");
+          if (label) label.textContent = item.label;
+        }
+        updateBadge(cell);
+      }
+
+      function removeScheduleItem(cell, taskId) {
+        if (!cell) return;
+        const itemsWrap = cell.querySelector(".schedule-items");
+        if (!itemsWrap) return;
+        const selector = `.schedule-item[data-task-id="${taskId || ""}"]`;
+        const existing = itemsWrap.querySelector(selector);
+        if (existing) existing.remove();
+        updateBadge(cell);
+      }
+    });
+  </script>
+{% endblock %}

@@ -1,0 +1,42 @@
+.app-handoff {
+  padding: 8px 6px 12px;
+}
+
+.app-title {
+  font-weight: 700;
+  letter-spacing: 0.3px;
+  margin-bottom: 8px;
+}
+
+.handoff-group {
+  margin-bottom: 10px;
+  padding: 8px 10px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 8px;
+}
+
+.handoff-group-title {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  color: #9fb3c8;
+  margin-bottom: 6px;
+}
+
+.handoff-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.handoff-item {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 4px 0;
+}
+
+.handoff-item a {
+  text-decoration: none;
+}

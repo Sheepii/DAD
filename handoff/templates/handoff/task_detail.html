@@ -1,0 +1,234 @@
+{% extends "handoff/base.html" %}
+{% load handoff_extras %}
+
+{% block title %}{{ task.title }} - DAD{% endblock %}
+
+{% block content %}
+  <div class="d-flex justify-content-between align-items-start mb-3">
+    <div>
+      <h1 class="h3 mb-1">{{ task.title }}</h1>
+      <div class="text-muted small">
+        Due {{ task.due_date|date:"F j, Y" }} · {{ task.assigned_to }}
+      </div>
+    </div>
+    <span
+      class="badge {% if task.status == 'DONE' %}text-bg-success{% elif task.status == 'IN_PROGRESS' %}text-bg-warning{% else %}text-bg-secondary{% endif %}"
+    >
+      {{ task.get_status_display }}
+    </span>
+  </div>
+
+  <div class="row g-3">
+    <div class="col-12 col-lg-5 order-1 order-lg-2">
+      <div class="card shadow-sm">
+        <div class="card-body" id="steps-panel" data-task-id="{{ task.id }}">
+          {% include "handoff/_task_steps.html" %}
+        </div>
+      </div>
+
+      <div class="card shadow-sm mt-3">
+        <div class="card-body">
+          {% include "handoff/_mockups_panel.html" %}
+        </div>
+      </div>
+
+      <div class="card shadow-sm mt-3">
+        <div class="card-body">
+          <details>
+            <summary class="fw-semibold">Replace design (optional)</summary>
+            <form
+              class="border rounded p-3 mt-2 bg-light"
+              method="post"
+              enctype="multipart/form-data"
+              action="{% url 'handoff:replace_design' task.id %}"
+              id="design-upload-form"
+            >
+              {% csrf_token %}
+              <div class="text-muted small mb-2">
+                Drag a new design here to replace today’s design.
+              </div>
+              <input type="file" name="design_file" class="form-control" accept="image/*" />
+              <button class="btn btn-sm btn-primary mt-2" type="submit">Upload New Design</button>
+              <div class="progress mt-3 d-none" id="design-upload-progress">
+                <div
+                  class="progress-bar progress-bar-striped progress-bar-animated"
+                  role="progressbar"
+                  style="width: 0%"
+                  aria-valuemin="0"
+                  aria-valuemax="100"
+                ></div>
+              </div>
+            </form>
+          </details>
+        </div>
+      </div>
+    </div>
+
+    <div class="col-12 col-lg-7 order-2 order-lg-1">
+      <div class="card shadow-sm mb-3">
+        <div class="card-body">
+          <div class="d-flex justify-content-between align-items-center">
+            <h5 class="card-title mb-0">Design File</h5>
+            {% if task.drive_design_file_id %}
+              <div class="d-flex gap-2">
+                <a
+                  class="btn btn-outline-primary btn-sm"
+                  href="https://drive.google.com/file/d/{{ task.drive_design_file_id }}/view"
+                  target="_blank"
+                  rel="noopener"
+                >
+                  Open
+                </a>
+                <a
+                  class="btn btn-primary btn-sm"
+                  href="https://drive.google.com/uc?export=download&id={{ task.drive_design_file_id }}"
+                >
+                  Download
+                </a>
+              </div>
+            {% endif %}
+          </div>
+          {% if task.drive_design_file_id %}
+            <div class="ratio ratio-16x9 mt-3 rounded" style="background: #000;">
+              <iframe
+                src="https://drive.google.com/file/d/{{ task.drive_design_file_id }}/preview?t={{ task.updated_at|date:'U' }}"
+                allow="autoplay"
+                style="background: transparent;"
+              ></iframe>
+            </div>
+          {% else %}
+            <div class="text-muted mt-2">No design file attached yet.</div>
+          {% endif %}
+        </div>
+      </div>
+
+      <div class="card shadow-sm mb-3">
+        <div class="card-body">
+          <h5 class="card-title">Details</h5>
+          <div class="accordion" id="detailsAccordion">
+            <div class="accordion-item">
+              <h2 class="accordion-header">
+                <button class="accordion-button" type="button" data-bs-toggle="collapse" data-bs-target="#notesPanel">
+                  Notes
+                </button>
+              </h2>
+              <div id="notesPanel" class="accordion-collapse collapse show" data-bs-parent="#detailsAccordion">
+                <div class="accordion-body">
+                  {% if task.notes %}
+                    <p class="mb-0">{{ task.notes|linebreaksbr }}</p>
+                  {% else %}
+                    <div class="text-muted">No notes.</div>
+                  {% endif %}
+                </div>
+              </div>
+            </div>
+            <div class="accordion-item">
+              <h2 class="accordion-header">
+                <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#videoPanel">
+                  Training Video
+                </button>
+              </h2>
+              <div id="videoPanel" class="accordion-collapse collapse" data-bs-parent="#detailsAccordion">
+                <div class="accordion-body">
+                  {% if task.video_url %}
+                    <a class="btn btn-outline-secondary" href="{{ task.video_url }}" target="_blank" rel="noopener">
+                      Watch
+                    </a>
+                  {% else %}
+                    <div class="text-muted">No training video linked.</div>
+                  {% endif %}
+                </div>
+              </div>
+            </div>
+            <div class="accordion-item">
+              <h2 class="accordion-header">
+                <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#assetsPanel">
+                  Static Assets
+                </button>
+              </h2>
+              <div id="assetsPanel" class="accordion-collapse collapse" data-bs-parent="#detailsAccordion">
+                <div class="accordion-body">
+                  {% if task.template and task.template.attachments.all %}
+                    <div class="list-group list-group-flush">
+                      {% for asset in task.template.attachments.all %}
+                        <a
+                          class="list-group-item list-group-item-action d-flex justify-content-between align-items-center"
+                          href="https://drive.google.com/file/d/{{ asset.drive_file_id }}/view"
+                          target="_blank"
+                          rel="noopener"
+                        >
+                          <div>
+                            <div class="fw-semibold">{{ asset.label|default:asset.filename|default:"Asset" }}</div>
+                            <div class="text-muted small">{{ asset.filename }}</div>
+                          </div>
+                          <span class="badge text-bg-secondary">Open</span>
+                        </a>
+                      {% endfor %}
+                    </div>
+                  {% else %}
+                    <div class="text-muted">No static assets.</div>
+                  {% endif %}
+                </div>
+              </div>
+            </div>
+            <div class="accordion-item">
+              <h2 class="accordion-header">
+                <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#attachmentsPanel">
+                  Design Download
+                </button>
+              </h2>
+              <div id="attachmentsPanel" class="accordion-collapse collapse" data-bs-parent="#detailsAccordion">
+                <div class="accordion-body">
+                  {% if latest_design_attachment %}
+                    <div class="d-flex justify-content-between align-items-center">
+                      <div>
+                        <div class="fw-semibold">{{ latest_design_attachment.filename|default:"Design file" }}</div>
+                        <div class="text-muted small">Current design</div>
+                      </div>
+                      <a
+                        class="btn btn-sm btn-outline-primary"
+                        href="https://drive.google.com/file/d/{{ latest_design_attachment.drive_file_id }}/view"
+                        target="_blank"
+                        rel="noopener"
+                      >
+                        Open
+                      </a>
+                    </div>
+                  {% else %}
+                    <div class="text-muted">No design uploaded yet.</div>
+                  {% endif %}
+                </div>
+              </div>
+            </div>
+            <div class="accordion-item">
+              <h2 class="accordion-header">
+                <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#folderPanel">
+                  Mockup Source Folder
+                </button>
+              </h2>
+              <div id="folderPanel" class="accordion-collapse collapse" data-bs-parent="#detailsAccordion">
+                <div class="accordion-body">
+                  {% if task.drive_mockup_folder_id %}
+                    <a
+                      class="btn btn-outline-secondary"
+                      href="https://drive.google.com/drive/folders/{{ task.drive_mockup_folder_id }}"
+                      target="_blank"
+                      rel="noopener"
+                    >
+                      Open Folder
+                    </a>
+                  {% else %}
+                    <div class="text-muted">No mockup folder set.</div>
+                  {% endif %}
+                  {% if folder_error %}
+                    <div class="text-danger small mt-2">{{ folder_error }}</div>
+                  {% endif %}
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+{% endblock %}
