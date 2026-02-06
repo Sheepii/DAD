@@ -360,6 +360,7 @@ class AttachmentInline(admin.TabularInline):
 class TemplateAttachmentInline(admin.TabularInline):
     model = TemplateAttachment
     extra = 0
+    fields = ("label", "drive_file_id", "filename", "include_in_mockup_zip")
 
 
 class MockupTemplateInline(admin.TabularInline):

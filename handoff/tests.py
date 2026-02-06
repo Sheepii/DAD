@@ -1,9 +1,21 @@
 from django.test import SimpleTestCase, TestCase
 from django.contrib.auth import get_user_model
 from django.utils import timezone
+from unittest.mock import patch
+import io
+import zipfile
 
 from .etsy import normalize_tags_csv, suggest_title_from_filename, validate_tags
-from .models import ScheduledDesign, Store, StoreMembership, Task, TaskPublication
+from .models import (
+    MockupSlot,
+    ScheduledDesign,
+    Store,
+    StoreMembership,
+    Task,
+    TaskPublication,
+    TaskTemplate,
+    TemplateAttachment,
+)
 
 
 class EtsyTagValidationTests(SimpleTestCase):
@@ -96,3 +108,41 @@ class TodayStoreAccessTests(TestCase):
         response = self.client.get("/today/")
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, task.title)
+
+
+class MockupDownloadZipTests(TestCase):
+    @patch("handoff.views.download_file_bytes")
+    def test_download_zip_includes_mockups_and_template_extras(self, mock_download):
+        user_model = get_user_model()
+        user = user_model.objects.create_user(username="user1", password="pass12345")
+        self.client.force_login(user)
+
+        template = TaskTemplate.objects.create(name="Template A")
+        task = Task.objects.create(
+            title="Task A",
+            due_date=timezone.localdate(),
+            template=template,
+        )
+        MockupSlot.objects.create(task=task, order=1, drive_file_id="mockup-file-id", filename="mockup1.png")
+        TemplateAttachment.objects.create(
+            template=template,
+            drive_file_id="extra-file-id",
+            filename="care-card.png",
+            include_in_mockup_zip=True,
+        )
+
+        def fake_download(file_id):
+            if file_id == "mockup-file-id":
+                return "mockup1.png", "image/png", b"mockup-bytes"
+            return "care-card.png", "image/png", b"extra-bytes"
+
+        mock_download.side_effect = fake_download
+
+        response = self.client.get(f"/task/{task.id}/mockups/download/")
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response["Content-Type"], "application/zip")
+
+        with zipfile.ZipFile(io.BytesIO(response.content), "r") as zf:
+            names = zf.namelist()
+            self.assertIn("01_mockup1.png", names)
+            self.assertIn("extras/01_care-card.png", names)

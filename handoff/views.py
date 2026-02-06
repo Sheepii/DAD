@@ -651,15 +651,41 @@ def replace_design(request, task_id: int):
 @login_required
 def download_mockups(request, task_id: int):
     task = get_object_or_404(Task, pk=task_id)
-    slots = task.mockup_slots.exclude(drive_file_id="").order_by("order")
-    if not slots.exists():
+    slots = list(task.mockup_slots.exclude(drive_file_id="").order_by("order"))
+    template_assets = []
+    if task.template_id:
+        template_assets = list(
+            task.template.attachments.filter(
+                include_in_mockup_zip=True
+            ).exclude(drive_file_id="")
+        )
+    if not slots and not template_assets:
         return redirect("handoff:task_detail", task_id=task.id)
 
     zip_buffer = io.BytesIO()
     with zipfile.ZipFile(zip_buffer, "w", zipfile.ZIP_DEFLATED) as zip_file:
+        seen_names = set()
+        def unique_name(name: str) -> str:
+            base = name
+            idx = 2
+            while name in seen_names:
+                if "." in base:
+                    left, ext = base.rsplit(".", 1)
+                    name = f"{left}-{idx}.{ext}"
+                else:
+                    name = f"{base}-{idx}"
+                idx += 1
+            seen_names.add(name)
+            return name
+
         for slot in slots:
             name, _, data = download_file_bytes(slot.drive_file_id)
-            safe_name = f"{slot.order:02d}_{name}"
+            safe_name = unique_name(f"{slot.order:02d}_{name}")
+            zip_file.writestr(safe_name, data)
+        for idx, asset in enumerate(template_assets, start=1):
+            name, _, data = download_file_bytes(asset.drive_file_id)
+            asset_name = asset.filename or name or f"template-extra-{idx}.png"
+            safe_name = unique_name(f"extras/{idx:02d}_{asset_name}")
             zip_file.writestr(safe_name, data)
     zip_buffer.seek(0)
 

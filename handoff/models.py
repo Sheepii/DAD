@@ -339,6 +339,10 @@ class TemplateAttachment(models.Model):
     label = models.CharField(max_length=200, blank=True)
     drive_file_id = models.CharField(max_length=200)
     filename = models.CharField(max_length=255, blank=True)
+    include_in_mockup_zip = models.BooleanField(
+        default=True,
+        help_text="Include this file in front-end mockup ZIP downloads.",
+    )
     created_at = models.DateTimeField(auto_now_add=True)
 
     def save(self, *args, **kwargs):
