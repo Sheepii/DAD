@@ -321,6 +321,47 @@ def deploy_latest_view(request):
     return redirect("/admin/handoff/deploy/")
 
 
+def upload_template_attachment_view(request):
+    if request.method != "POST":
+        return JsonResponse({"ok": False, "error": "POST required."}, status=405)
+    upload = request.FILES.get("attachment_file")
+    if not upload:
+        return JsonResponse({"ok": False, "error": "Missing file upload."}, status=400)
+    template_id = request.POST.get("template_id", "").strip()
+    if not template_id:
+        return JsonResponse({"ok": False, "error": "Missing template id."}, status=400)
+    try:
+        TaskTemplate.objects.get(pk=int(template_id))
+    except (TaskTemplate.DoesNotExist, ValueError):
+        return JsonResponse({"ok": False, "error": "Invalid template id."}, status=400)
+
+    temp_path = None
+    try:
+        if hasattr(upload, "temporary_file_path"):
+            temp_path = upload.temporary_file_path()
+        else:
+            with tempfile.NamedTemporaryFile(delete=False) as temp:
+                for chunk in upload.chunks():
+                    temp.write(chunk)
+                temp_path = temp.name
+        file_id = upload_template_asset(temp_path, upload.name)
+    except Exception as exc:
+        return JsonResponse({"ok": False, "error": str(exc)}, status=500)
+    finally:
+        if temp_path and not hasattr(upload, "temporary_file_path") and os.path.exists(temp_path):
+            os.remove(temp_path)
+
+    return JsonResponse(
+        {
+            "ok": True,
+            "drive_file_id": file_id,
+            "filename": upload.name,
+            "thumbnail_url": f"https://drive.google.com/thumbnail?id={file_id}&sz=w240",
+            "open_url": f"https://drive.google.com/file/d/{file_id}/view",
+        }
+    )
+
+
 def emergency_recycle_view(request):
     if request.method != "POST":
         return redirect("/admin/handoff/schedule/")
@@ -421,6 +462,7 @@ def _get_urls():
     custom = [
         path("handoff/schedule/", admin.site.admin_view(handoff_schedule_view), name="handoff_schedule"),
         path("handoff/deploy/", admin.site.admin_view(deploy_latest_view), name="handoff_deploy_latest"),
+        path("handoff/template-attachment/upload/", admin.site.admin_view(upload_template_attachment_view), name="handoff_template_attachment_upload"),
         path("handoff/open-dump/", admin.site.admin_view(open_dump_folder_view), name="handoff_open_dump_folder"),
         path("handoff/intake/", admin.site.admin_view(intake_designs_view), name="handoff_intake_designs"),
         path("handoff/emergency/", admin.site.admin_view(emergency_recycle_view), name="handoff_emergency_recycle"),
