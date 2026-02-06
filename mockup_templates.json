@@ -1,0 +1,221 @@
+[
+{
+  "model": "handoff.tasktemplate",
+  "pk": 1,
+  "fields": {
+    "name": "T-Shirts",
+    "default_steps": [],
+    "default_video_url": "",
+    "sample_design_drive_file_id": "1WolEb0jxomlT1aGzM6YlY_6mIhE7jfSa",
+    "etsy_title_suffix": "",
+    "etsy_description_default": ""
+  }
+},
+{
+  "model": "handoff.mockuptemplate",
+  "pk": 1,
+  "fields": {
+    "template": 1,
+    "order": 1,
+    "label": "1",
+    "background_drive_file_id": "1Gi-Xaera8FRinB9vvZ2mAKDRgT32MU1A",
+    "overlay_drive_file_id": "1agrrn7VC0GcB2tFx04XsiBYKjLXumR5f",
+    "mask_drive_file_id": "",
+    "overlay_position": "OVER",
+    "design_x": 580,
+    "design_y": 1146,
+    "design_width": 2800,
+    "design_height": 2800,
+    "created_at": "2026-02-04T20:52:40.677Z"
+  }
+},
+{
+  "model": "handoff.mockuptemplate",
+  "pk": 2,
+  "fields": {
+    "template": 1,
+    "order": 2,
+    "label": "2",
+    "background_drive_file_id": "1_X5oqg-TkdfjXEwf64fjt0hQwJ5arhHV",
+    "overlay_drive_file_id": "",
+    "mask_drive_file_id": "",
+    "overlay_position": "OVER",
+    "design_x": 660,
+    "design_y": 1327,
+    "design_width": 1153,
+    "design_height": 1153,
+    "created_at": "2026-02-04T21:41:39.768Z"
+  }
+},
+{
+  "model": "handoff.mockuptemplate",
+  "pk": 3,
+  "fields": {
+    "template": 1,
+    "order": 3,
+    "label": "3",
+    "background_drive_file_id": "1BbttfGmZ0KjvoXOEo6_IagpkizfZVUry",
+    "overlay_drive_file_id": "",
+    "mask_drive_file_id": "",
+    "overlay_position": "OVER",
+    "design_x": 2326,
+    "design_y": 2573,
+    "design_width": 640,
+    "design_height": 640,
+    "created_at": "2026-02-04T22:50:24.414Z"
+  }
+},
+{
+  "model": "handoff.mockuptemplate",
+  "pk": 4,
+  "fields": {
+    "template": 1,
+    "order": 4,
+    "label": "4",
+    "background_drive_file_id": "1oNUQcA28XajWqasNm2UZBkJGzH7BnW55",
+    "overlay_drive_file_id": "",
+    "mask_drive_file_id": "",
+    "overlay_position": "OVER",
+    "design_x": 1167,
+    "design_y": 973,
+    "design_width": 1287,
+    "design_height": 1287,
+    "created_at": "2026-02-04T23:23:00.545Z"
+  }
+},
+{
+  "model": "handoff.mockuptemplate",
+  "pk": 5,
+  "fields": {
+    "template": 1,
+    "order": 6,
+    "label": "6",
+    "background_drive_file_id": "1-bfzC6j2Ixd-TF5sazzIvtsgt6iN1dkD",
+    "overlay_drive_file_id": "",
+    "mask_drive_file_id": "",
+    "overlay_position": "OVER",
+    "design_x": 1233,
+    "design_y": 1046,
+    "design_width": 1447,
+    "design_height": 1447,
+    "created_at": "2026-02-04T23:32:10.368Z"
+  }
+},
+{
+  "model": "handoff.mockupdesignbox",
+  "pk": 6,
+  "fields": {
+    "template": 4,
+    "order": 1,
+    "x": 1167,
+    "y": 973,
+    "width": 1287,
+    "height": 1287,
+    "rotation": 0.0
+  }
+},
+{
+  "model": "handoff.mockupdesignbox",
+  "pk": 9,
+  "fields": {
+    "template": 1,
+    "order": 1,
+    "x": 580,
+    "y": 1146,
+    "width": 2800,
+    "height": 2800,
+    "rotation": 0.0
+  }
+},
+{
+  "model": "handoff.mockupdesignbox",
+  "pk": 11,
+  "fields": {
+    "template": 3,
+    "order": 1,
+    "x": 387,
+    "y": 793,
+    "width": 707,
+    "height": 707,
+    "rotation": 0.0
+  }
+},
+{
+  "model": "handoff.mockupdesignbox",
+  "pk": 12,
+  "fields": {
+    "template": 3,
+    "order": 2,
+    "x": 1687,
+    "y": 767,
+    "width": 686,
+    "height": 686,
+    "rotation": 0.0
+  }
+},
+{
+  "model": "handoff.mockupdesignbox",
+  "pk": 13,
+  "fields": {
+    "template": 3,
+    "order": 3,
+    "x": 2920,
+    "y": 774,
+    "width": 693,
+    "height": 693,
+    "rotation": 0.0
+  }
+},
+{
+  "model": "handoff.mockupdesignbox",
+  "pk": 14,
+  "fields": {
+    "template": 3,
+    "order": 4,
+    "x": 953,
+    "y": 2567,
+    "width": 640,
+    "height": 640,
+    "rotation": 0.0
+  }
+},
+{
+  "model": "handoff.mockupdesignbox",
+  "pk": 15,
+  "fields": {
+    "template": 3,
+    "order": 5,
+    "x": 2326,
+    "y": 2573,
+    "width": 640,
+    "height": 640,
+    "rotation": 0.0
+  }
+},
+{
+  "model": "handoff.mockupdesignbox",
+  "pk": 16,
+  "fields": {
+    "template": 5,
+    "order": 1,
+    "x": 1233,
+    "y": 1046,
+    "width": 1447,
+    "height": 1447,
+    "rotation": 4.0
+  }
+},
+{
+  "model": "handoff.mockupdesignbox",
+  "pk": 17,
+  "fields": {
+    "template": 2,
+    "order": 1,
+    "x": 660,
+    "y": 1327,
+    "width": 1153,
+    "height": 1153,
+    "rotation": 0.0
+  }
+}
+]
