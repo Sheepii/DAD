@@ -211,7 +211,16 @@ class TaskAdminForm(forms.ModelForm):
 
 class TemplateAttachmentForm(forms.ModelForm):
     attachment_upload = forms.FileField(required=False, label="Upload file")
+    drive_file_id = forms.CharField(required=False, label="Drive file id")
 
     class Meta:
         model = TemplateAttachment
         fields = "__all__"
+
+    def clean(self):
+        cleaned = super().clean()
+        uploaded = cleaned.get("attachment_upload")
+        drive_file_id = (cleaned.get("drive_file_id") or "").strip()
+        if not uploaded and not drive_file_id:
+            self.add_error("drive_file_id", "Upload a file or enter a Drive file ID.")
+        return cleaned

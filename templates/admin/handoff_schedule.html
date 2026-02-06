@@ -73,6 +73,44 @@
     .schedule-weekdays div {
       text-align: center;
     }
+    .schedule-more {
+      position: relative;
+    }
+    .schedule-more details {
+      position: relative;
+    }
+    .schedule-more-menu {
+      position: absolute;
+      top: 120%;
+      left: 0;
+      min-width: 220px;
+      padding: 10px;
+      border: 1px solid #2c2c2c;
+      border-radius: 8px;
+      background: #1c1c1c;
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+      z-index: 20;
+      display: grid;
+      gap: 8px;
+    }
+    .schedule-more-menu form,
+    .schedule-more-menu a {
+      margin: 0;
+    }
+    .dismiss-message-btn {
+      float: right;
+      margin-left: 8px;
+      background: transparent;
+      border: 0;
+      color: inherit;
+      font-size: 18px;
+      line-height: 1;
+      cursor: pointer;
+      opacity: 0.75;
+    }
+    .dismiss-message-btn:hover {
+      opacity: 1;
+    }
   </style>
 
   <div class="module">
@@ -96,12 +134,8 @@
         {% endif %}
         <button class="button" type="submit">Run Intake</button>
       </form>
-      <form method="post" action="{% url 'admin:handoff_deploy_latest' %}">
-        {% csrf_token %}
-        <button class="button" type="submit">Deploy Latest</button>
-      </form>
       {% if selected_store %}
-        <a class="button" href="{% url 'admin:handoff_open_dump_folder' %}?store={{ selected_store.id }}">
+        <a class="button" href="{% url 'admin:handoff_open_dump_folder' %}?store={{ selected_store.id }}" target="_blank" rel="noopener noreferrer">
           Open {{ selected_store.name }} Dump Folder
         </a>
       {% else %}
@@ -109,14 +143,21 @@
           Open Store Dump Folder
         </a>
       {% endif %}
-      <form method="post" action="{% url 'admin:handoff_emergency_recycle' %}">
-        {% csrf_token %}
-        {% if selected_store %}
-          <input type="hidden" name="store_id" value="{{ selected_store.id }}">
-        {% endif %}
-        <button class="button" type="submit">Emergency Recycle Today</button>
-      </form>
-      <a class="button" href="{% url 'admin:handoff_mockup_studio' %}">Mockup Studio</a>
+      <div class="schedule-more">
+        <details>
+          <summary class="button">More Actions</summary>
+          <div class="schedule-more-menu">
+            <form method="post" action="{% url 'admin:handoff_emergency_recycle' %}">
+              {% csrf_token %}
+              {% if selected_store %}
+                <input type="hidden" name="store_id" value="{{ selected_store.id }}">
+              {% endif %}
+              <button class="button" type="submit">Emergency Recycle Today</button>
+            </form>
+            <a class="button" href="{% url 'admin:handoff_mockup_studio' %}">Mockup Studio</a>
+          </div>
+        </details>
+      </div>
       <form method="get" style="margin-left:auto;display:flex;gap:8px;align-items:center;">
         <input type="hidden" name="month" value="{{ month_value }}">
         <label>Task</label>
@@ -513,6 +554,16 @@
         if (existing) existing.remove();
         updateBadge(cell);
       }
+
+      document.querySelectorAll(".messagelist li").forEach((item) => {
+        const close = document.createElement("button");
+        close.type = "button";
+        close.className = "dismiss-message-btn";
+        close.setAttribute("aria-label", "Dismiss message");
+        close.innerHTML = "&times;";
+        close.addEventListener("click", () => item.remove());
+        item.prepend(close);
+      });
     });
   </script>
 {% endblock %}

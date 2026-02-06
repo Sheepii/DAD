@@ -1,0 +1,13 @@
+{% extends "admin/base_site.html" %}
+
+{% block content %}
+  <div class="module">
+    <h1>Deploy Latest</h1>
+    <p>Run pull, dependency install, and migrations on this server.</p>
+    <form method="post" action="{% url 'admin:handoff_deploy_latest' %}">
+      {% csrf_token %}
+      <button class="button default" type="submit">Run Deploy</button>
+      <a class="button" href="/admin/handoff/schedule/">Back to Design Schedule</a>
+    </form>
+  </div>
+{% endblock %}

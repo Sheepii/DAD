@@ -284,7 +284,8 @@ def open_dump_folder_view(request):
 
 def deploy_latest_view(request):
     if request.method != "POST":
-        return redirect("/admin/handoff/schedule/")
+        context = dict(admin.site.each_context(request))
+        return render(request, "admin/handoff_deploy.html", context)
 
     project_dir = str(settings.BASE_DIR)
     commands = [
@@ -317,7 +318,7 @@ def deploy_latest_view(request):
             return redirect("/admin/handoff/schedule/")
 
     messages.success(request, "Deploy completed: pull, dependencies, and migrations are up to date.")
-    return redirect("/admin/handoff/schedule/")
+    return redirect("/admin/handoff/deploy/")
 
 
 def emergency_recycle_view(request):
