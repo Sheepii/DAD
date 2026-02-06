@@ -1,0 +1,18 @@
+services:
+  - name: dad-web
+    type: web
+    ports:
+      - port: 8000
+        protocol: http
+    env:
+      - key: DJANGO_ALLOWED_HOSTS
+        value: "${KOYEB_PUBLIC_DOMAIN}"
+      - key: DEBUG
+        value: "false"
+    build:
+      buildCommand: |
+        pip install -r requirements.txt
+        python manage.py collectstatic --noinput
+        python manage.py migrate
+    run:
+      command: gunicorn dad.wsgi:application --bind 0.0.0.0:$PORT

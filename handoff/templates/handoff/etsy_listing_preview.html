@@ -1,0 +1,542 @@
+{% extends "handoff/base.html" %}
+
+{% block title %}Etsy Preview - {{ task.title }}{% endblock %}
+
+{% block content %}
+  <div class="d-flex justify-content-between align-items-start mb-3">
+    <div>
+      <div class="text-muted small mb-1">Dummy screen (local tool) · Not synced to Etsy</div>
+      <h1 class="h4 mb-0">Etsy Listing Preview</h1>
+      <div class="text-muted small">
+        From task: <a href="{% url 'handoff:task_detail' task.id %}{% if store %}?store={{ store.id }}{% endif %}">{{ task.title }}</a>
+      </div>
+    </div>
+    <div class="d-flex align-items-center gap-2">
+      <span class="text-muted small d-none" id="save-status"></span>
+      <button class="btn btn-primary btn-sm" type="button" id="save-dad">Save to DAD</button>
+      <a class="btn btn-outline-secondary btn-sm" href="{% url 'handoff:task_detail' task.id %}{% if store %}?store={{ store.id }}{% endif %}">Back</a>
+    </div>
+  </div>
+
+  <div class="row g-3">
+    <div class="col-12 col-lg-7">
+      <div class="card shadow-sm">
+        <div class="card-body">
+          <div class="d-flex justify-content-between align-items-center mb-2">
+            <h5 class="card-title mb-0">Photos</h5>
+            <div class="text-muted small">
+              {{ mockup_slots|length }} uploaded
+            </div>
+          </div>
+
+          {% if mockup_slots %}
+            <div class="row g-2">
+              {% for slot in mockup_slots %}
+                <div class="col-6 col-md-4">
+                  <div class="border rounded bg-dark" style="aspect-ratio: 1 / 1; overflow: hidden;">
+                    <img
+                      src="https://drive.google.com/thumbnail?id={{ slot.drive_file_id }}&sz=w600&t={{ slot.updated_at|date:'U' }}"
+                      alt="Mockup {{ slot.order }}"
+                      class="w-100 h-100"
+                      style="object-fit: cover;"
+                      loading="lazy"
+                    />
+                  </div>
+                  <div class="text-muted small mt-1">
+                    {% if slot.label %}{{ slot.label }}{% else %}Photo {{ slot.order }}{% endif %}
+                  </div>
+                </div>
+              {% endfor %}
+            </div>
+          {% else %}
+            <div class="alert alert-secondary mb-0">
+              No mockups uploaded yet. Upload mockups on the task page to see them here.
+            </div>
+          {% endif %}
+        </div>
+      </div>
+
+      <div class="card shadow-sm mt-3">
+        <div class="card-body">
+          <h5 class="card-title">Description</h5>
+          <div class="d-flex gap-2 mb-2">
+            <button class="btn btn-outline-primary btn-sm" type="button" id="copy-description">Copy</button>
+            <div class="text-muted small align-self-center">Copy/paste into Etsy (defaults from template)</div>
+          </div>
+          <textarea class="form-control font-monospace" id="listing-description" rows="10" placeholder="Paste or write the Etsy description here."></textarea>
+          <div class="text-muted small mt-2">
+            Tip: Keep the first 1–2 lines strong (what it is + who it’s for) for mobile.
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="col-12 col-lg-5">
+      <div class="card shadow-sm">
+        <div class="card-body">
+          <h5 class="card-title">Listing details</h5>
+
+          <label class="form-label small text-muted mb-1" for="listing-title">Title</label>
+          <div class="d-flex gap-2 mb-2">
+            <input class="form-control" id="listing-title" maxlength="140" placeholder="Etsy title (max 140 chars)" />
+            <button class="btn btn-outline-primary" type="button" id="copy-title">Copy</button>
+          </div>
+
+          <div class="row g-2 mb-2">
+            <div class="col-6">
+              <label class="form-label small text-muted mb-1" for="listing-price">Price</label>
+              <input class="form-control" id="listing-price" inputmode="decimal" placeholder="e.g. 9.99" />
+            </div>
+            <div class="col-6">
+              <label class="form-label small text-muted mb-1" for="listing-sku">SKU (optional)</label>
+              <input class="form-control" id="listing-sku" placeholder="e.g. DAD-2026-02-05" />
+            </div>
+          </div>
+
+          <div class="border rounded p-2 bg-light mb-3">
+            <div class="small text-muted">What Dad sees as the “publish checklist”</div>
+            <ul class="mb-0 small">
+              <li>Title, price, SKU (if used)</li>
+              <li>13 tags valid and pasted</li>
+              <li>Mockups uploaded (and saved locally if needed)</li>
+              <li>Description pasted</li>
+            </ul>
+          </div>
+
+          <h6 class="mb-2">Tags (13 total)</h6>
+          <div class="text-muted small mb-2">
+            Requirements: exactly 13 tags · each under 20 characters · letters/numbers/spaces only · comma separated.
+          </div>
+          <div class="d-flex gap-2 mb-2">
+            <button class="btn btn-success btn-sm" type="button" id="generate-tags">Generate tags (AI)</button>
+            <button class="btn btn-outline-primary btn-sm" type="button" id="copy-tags">Copy tags</button>
+            <button class="btn btn-outline-secondary btn-sm" type="button" id="clear-tags">Clear</button>
+            <div class="text-muted small align-self-center" id="tags-status"></div>
+          </div>
+          <textarea
+            class="form-control font-monospace"
+            id="listing-tags"
+            rows="4"
+            placeholder="tag one, tag two, tag three, ..."
+          ></textarea>
+          <div class="mt-2 small">
+            <div class="text-muted">Normalized output</div>
+            <div class="input-group">
+              <input class="form-control font-monospace" id="tags-normalized" readonly />
+              <button class="btn btn-outline-primary" type="button" id="copy-tags-normalized">Copy</button>
+            </div>
+          </div>
+
+          <details class="mt-3">
+            <summary class="fw-semibold">Tag validation</summary>
+            <div class="mt-2" id="tags-validation"></div>
+          </details>
+        </div>
+      </div>
+
+      {% if sop_guides %}
+        <div class="card shadow-sm mt-3">
+          <div class="card-body">
+            <div class="d-flex justify-content-between align-items-center mb-2">
+              <h5 class="card-title mb-0">SOP Help</h5>
+              <a class="btn btn-outline-secondary btn-sm" href="{% url 'handoff:sop_library' %}">
+                Library
+              </a>
+            </div>
+            <div class="d-flex gap-2 mb-2 align-items-center">
+              <select class="form-select form-select-sm" id="sop-select">
+                {% for sop in sop_guides %}
+                  <option
+                    value="{{ sop.id }}"
+                    data-embed="{{ sop.embed_url }}"
+                    {% if sop.id == selected_sop_id %}selected{% endif %}
+                  >
+                    {{ sop.name }}
+                  </option>
+                {% endfor %}
+              </select>
+            </div>
+            <iframe
+              id="sop-embed"
+              src="{{ selected_sop_embed_url }}"
+              style="width: 100%; height: 420px; border: 0;"
+              allowfullscreen
+              loading="lazy"
+            ></iframe>
+          </div>
+        </div>
+      {% endif %}
+
+      <div class="card shadow-sm mt-3">
+        <div class="card-body">
+          <div class="d-flex justify-content-between align-items-center mb-2">
+            <h5 class="card-title mb-0">Stores</h5>
+            <div class="text-muted small">1 design/day per store</div>
+          </div>
+
+          {% if publications %}
+            <div class="d-grid gap-2" id="stores-panel">
+              {% for pub in publications %}
+                <div class="border rounded p-2 bg-light" data-store-id="{{ pub.store.id }}">
+                  <div class="d-flex justify-content-between align-items-center mb-2">
+                    <div class="fw-semibold">{{ pub.store.name }}</div>
+                    <span class="badge {% if pub.status == 'LISTED' %}text-bg-success{% else %}text-bg-secondary{% endif %}">
+                      {{ pub.get_status_display }}
+                    </span>
+                  </div>
+                  <div class="row g-2">
+                    <div class="col-5">
+                      <label class="form-label small text-muted mb-1">Status</label>
+                      <select class="form-select form-select-sm store-status">
+                        <option value="QUEUED" {% if pub.status == 'QUEUED' %}selected{% endif %}>Queued</option>
+                        <option value="LISTED" {% if pub.status == 'LISTED' %}selected{% endif %}>Listed</option>
+                      </select>
+                    </div>
+                    <div class="col-7">
+                      <label class="form-label small text-muted mb-1">Listing URL (optional)</label>
+                      <input class="form-control form-control-sm store-url" value="{{ pub.listing_url }}" placeholder="https://www.etsy.com/listing/..." />
+                    </div>
+                  </div>
+                  {% if pub.listed_at %}
+                    <div class="text-muted small mt-2">Listed at {{ pub.listed_at|date:"M j, Y g:i A" }}</div>
+                  {% endif %}
+                </div>
+              {% endfor %}
+            </div>
+            <div class="text-muted small mt-2">
+              Tip: paste the Etsy listing URL after publishing so you can jump back in later.
+            </div>
+          {% else %}
+            <div class="text-muted">No active stores configured yet. Add them in Admin → Stores.</div>
+          {% endif %}
+        </div>
+      </div>
+
+      <div class="card shadow-sm mt-3">
+        <div class="card-body">
+          <h5 class="card-title">Design links</h5>
+          {% if task.drive_design_file_id %}
+            <div class="d-flex flex-wrap gap-2">
+              <a
+                class="btn btn-outline-secondary btn-sm"
+                href="https://drive.google.com/file/d/{{ task.drive_design_file_id }}/view"
+                target="_blank"
+                rel="noopener"
+              >
+                Open design
+              </a>
+              <a
+                class="btn btn-outline-primary btn-sm"
+                href="https://drive.google.com/uc?export=download&id={{ task.drive_design_file_id }}"
+              >
+                Download
+              </a>
+            </div>
+          {% else %}
+            <div class="text-muted">No design file set on this task yet.</div>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    (function () {
+      const taskId = "{{ task.id }}";
+      const storageKey = `dad_etsy_${taskId}`;
+
+      const titleInput = document.getElementById("listing-title");
+      const descInput = document.getElementById("listing-description");
+      const tagsInput = document.getElementById("listing-tags");
+      const tagsNormalized = document.getElementById("tags-normalized");
+      const tagsStatus = document.getElementById("tags-status");
+      const tagsValidation = document.getElementById("tags-validation");
+      const saveStatus = document.getElementById("save-status");
+
+      function readDefaults() {
+        const titleNode = document.getElementById("default-title");
+        const descNode = document.getElementById("default-desc");
+        const tagsNode = document.getElementById("default-tags");
+        const title = titleNode ? JSON.parse(titleNode.textContent || "\"\"") : "";
+        const desc = descNode ? JSON.parse(descNode.textContent || "\"\"") : "";
+        const tags = tagsNode ? JSON.parse(tagsNode.textContent || "\"\"") : "";
+        return { title, desc, tags };
+      }
+
+      function loadState() {
+        try {
+          const raw = localStorage.getItem(storageKey);
+          if (!raw) return null;
+          return JSON.parse(raw);
+        } catch {
+          return null;
+        }
+      }
+
+      function saveState() {
+        const state = {
+          title: titleInput ? titleInput.value : "",
+          description: descInput ? descInput.value : "",
+          tags: tagsInput ? tagsInput.value : "",
+        };
+        try {
+          localStorage.setItem(storageKey, JSON.stringify(state));
+        } catch {}
+      }
+
+      function normalizeTags(raw) {
+        const parts = (raw || "")
+          .split(",")
+          .map((t) => (t || "").trim())
+          .filter(Boolean);
+        return parts;
+      }
+
+      function isValidTag(tag) {
+        if (!tag) return false;
+        if (tag.length > 19) return false;
+        return /^[A-Za-z0-9 ]+$/.test(tag);
+      }
+
+      function renderTagsStatus(tags) {
+        const count = tags.length;
+        if (!tagsStatus) return;
+        if (count === 13) {
+          tagsStatus.textContent = "13/13";
+          tagsStatus.className = "text-success small align-self-center";
+        } else if (count > 13) {
+          tagsStatus.textContent = `${count}/13 (too many)`;
+          tagsStatus.className = "text-danger small align-self-center";
+        } else {
+          tagsStatus.textContent = `${count}/13`;
+          tagsStatus.className = "text-muted small align-self-center";
+        }
+      }
+
+      function renderTagsValidation(tags) {
+        if (!tagsValidation) return;
+        if (!tags.length) {
+          tagsValidation.innerHTML = '<div class="text-muted small">No tags yet.</div>';
+          return;
+        }
+        const rows = tags.map((tag, idx) => {
+          const ok = isValidTag(tag);
+          const lenOk = tag.length <= 19;
+          const charsOk = /^[A-Za-z0-9 ]+$/.test(tag);
+          const reasons = [];
+          if (!lenOk) reasons.push("20+ chars");
+          if (!charsOk) reasons.push("special chars");
+          return `
+            <div class="d-flex justify-content-between align-items-center border rounded p-2 mb-1 ${ok ? "border-success" : "border-danger"}">
+              <div class="font-monospace small">${idx + 1}. ${escapeHtml(tag)}</div>
+              <div class="small ${ok ? "text-success" : "text-danger"}">
+                ${ok ? "OK" : reasons.join(", ")}
+              </div>
+            </div>
+          `;
+        });
+        tagsValidation.innerHTML = rows.join("");
+      }
+
+      function escapeHtml(value) {
+        return (value || "")
+          .replaceAll("&", "&amp;")
+          .replaceAll("<", "&lt;")
+          .replaceAll(">", "&gt;")
+          .replaceAll('"', "&quot;")
+          .replaceAll("'", "&#039;");
+      }
+
+      async function copyText(value) {
+        const text = value || "";
+        try {
+          await navigator.clipboard.writeText(text);
+          return true;
+        } catch {
+          try {
+            const tmp = document.createElement("textarea");
+            tmp.value = text;
+            tmp.style.position = "fixed";
+            tmp.style.left = "-9999px";
+            document.body.appendChild(tmp);
+            tmp.focus();
+            tmp.select();
+            document.execCommand("copy");
+            tmp.remove();
+            return true;
+          } catch {
+            return false;
+          }
+        }
+      }
+
+      function refreshTags() {
+        const tags = normalizeTags(tagsInput ? tagsInput.value : "");
+        const normalized = tags.join(", ");
+        if (tagsNormalized) tagsNormalized.value = normalized;
+        renderTagsStatus(tags);
+        renderTagsValidation(tags);
+      }
+
+      function getCsrfToken() {
+        const token = document.querySelector('input[name="csrfmiddlewaretoken"]');
+        return token ? token.value : "";
+      }
+
+      function setSaveStatus(message, kind) {
+        if (!saveStatus) return;
+        saveStatus.textContent = message;
+        saveStatus.classList.remove("d-none", "text-muted", "text-success", "text-danger");
+        if (kind === "success") saveStatus.classList.add("text-success");
+        else if (kind === "error") saveStatus.classList.add("text-danger");
+        else saveStatus.classList.add("text-muted");
+      }
+
+      async function saveToDad() {
+        const title = titleInput ? titleInput.value : "";
+        const description = descInput ? descInput.value : "";
+        const tags = tagsInput ? tagsInput.value : "";
+        setSaveStatus("Saving...", "muted");
+        try {
+          const res = await fetch(`/task/${taskId}/etsy/save/`, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Accept: "application/json",
+              ...(getCsrfToken() ? { "X-CSRFToken": getCsrfToken() } : {}),
+            },
+            body: JSON.stringify({ title, description, tags }),
+          });
+          const payload = await res.json().catch(() => ({}));
+          if (!res.ok || !payload.ok) {
+            const msg = payload.error || (payload.errors ? payload.errors.join(" ") : "Save failed.");
+            setSaveStatus(msg, "error");
+            return;
+          }
+          const storesPanel = document.getElementById("stores-panel");
+          if (storesPanel) {
+            const items = [];
+            storesPanel.querySelectorAll("[data-store-id]").forEach((row) => {
+              const storeId = row.getAttribute("data-store-id");
+              const statusEl = row.querySelector(".store-status");
+              const urlEl = row.querySelector(".store-url");
+              items.push({
+                store_id: storeId ? Number(storeId) : null,
+                status: statusEl ? statusEl.value : "QUEUED",
+                listing_url: urlEl ? urlEl.value : "",
+              });
+            });
+            const pubsRes = await fetch(`/task/${taskId}/etsy/publications/save/`, {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                Accept: "application/json",
+                ...(getCsrfToken() ? { "X-CSRFToken": getCsrfToken() } : {}),
+              },
+              body: JSON.stringify({ publications: items }),
+            });
+            const pubsPayload = await pubsRes.json().catch(() => ({}));
+            if (!pubsRes.ok || !pubsPayload.ok) {
+              setSaveStatus(pubsPayload.error || "Saved listing, but store save failed.", "error");
+              saveState();
+              return;
+            }
+          }
+
+          setSaveStatus("Saved.", "success");
+          saveState();
+        } catch (err) {
+          setSaveStatus("Save failed.", "error");
+        }
+      }
+
+      async function generateTags() {
+        const title = titleInput ? titleInput.value : "";
+        const description = descInput ? descInput.value : "";
+        const productHint = "{{ product_suffix|escapejs }}";
+        setSaveStatus("Generating tags...", "muted");
+        try {
+          const res = await fetch(`/task/${taskId}/etsy/generate-tags/`, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Accept: "application/json",
+              ...(getCsrfToken() ? { "X-CSRFToken": getCsrfToken() } : {}),
+            },
+            body: JSON.stringify({ title, description, product_hint: productHint }),
+          });
+          const payload = await res.json().catch(() => ({}));
+          if (!res.ok || !payload.ok) {
+            const msg = payload.error || "Tag generation failed.";
+            setSaveStatus(msg, "error");
+            return;
+          }
+          if (tagsInput) tagsInput.value = payload.normalized || (payload.tags || []).join(", ");
+          refreshTags();
+          saveState();
+          setSaveStatus("Tags generated.", "success");
+        } catch {
+          setSaveStatus("Tag generation failed.", "error");
+        }
+      }
+
+      document.addEventListener("DOMContentLoaded", () => {
+        const sopSelect = document.getElementById("sop-select");
+        const sopFrame = document.getElementById("sop-embed");
+        if (sopSelect && sopFrame) {
+          const updateSop = () => {
+            const option = sopSelect.options[sopSelect.selectedIndex];
+            const embed = option ? option.dataset.embed : "";
+            if (embed) sopFrame.src = embed;
+          };
+          sopSelect.addEventListener("change", updateSop);
+          updateSop();
+        }
+
+        const defaults = readDefaults();
+        const state = loadState();
+        if (titleInput) titleInput.value = (state && state.title) || defaults.title || "";
+        if (descInput) descInput.value = (state && state.description) || defaults.desc || "";
+        if (tagsInput) tagsInput.value = (state && state.tags) || defaults.tags || "";
+
+        refreshTags();
+
+        [titleInput, descInput, tagsInput].forEach((el) => {
+          if (!el) return;
+          el.addEventListener("input", () => {
+            if (el === tagsInput) refreshTags();
+            saveState();
+          });
+        });
+
+        const copyTitleBtn = document.getElementById("copy-title");
+        if (copyTitleBtn) copyTitleBtn.addEventListener("click", () => copyText(titleInput ? titleInput.value : ""));
+
+        const copyDescBtn = document.getElementById("copy-description");
+        if (copyDescBtn) copyDescBtn.addEventListener("click", () => copyText(descInput ? descInput.value : ""));
+
+        const saveBtn = document.getElementById("save-dad");
+        if (saveBtn) saveBtn.addEventListener("click", saveToDad);
+
+        const generateTagsBtn = document.getElementById("generate-tags");
+        if (generateTagsBtn) generateTagsBtn.addEventListener("click", generateTags);
+
+        const copyTagsBtn = document.getElementById("copy-tags");
+        if (copyTagsBtn) copyTagsBtn.addEventListener("click", () => copyText(tagsInput ? tagsInput.value : ""));
+
+        const copyTagsNormBtn = document.getElementById("copy-tags-normalized");
+        if (copyTagsNormBtn) copyTagsNormBtn.addEventListener("click", () => copyText(tagsNormalized ? tagsNormalized.value : ""));
+
+        const clearTagsBtn = document.getElementById("clear-tags");
+        if (clearTagsBtn) clearTagsBtn.addEventListener("click", () => {
+          if (tagsInput) tagsInput.value = "";
+          refreshTags();
+          saveState();
+        });
+      });
+    })();
+  </script>
+  {{ listing_title|default:""|json_script:"default-title" }}
+  {{ listing_description|default:""|json_script:"default-desc" }}
+  {{ listing_tags|default:""|json_script:"default-tags" }}
+{% endblock %}

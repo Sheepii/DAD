@@ -1,0 +1,57 @@
+{% extends "handoff/base.html" %}
+
+{% block title %}SOP Library - DAD{% endblock %}
+
+{% block content %}
+  <div class="d-flex justify-content-between align-items-center mb-3">
+    <div>
+      <h1 class="h3 mb-1">SOP Library</h1>
+      <div class="text-muted small">Training guides for common tasks.</div>
+    </div>
+  </div>
+
+  <div class="row g-3">
+    <div class="col-12 col-lg-4">
+      <div class="list-group shadow-sm">
+        {% for sop in sops %}
+          <a
+            class="list-group-item list-group-item-action {% if selected_sop and selected_sop.id == sop.id %}active{% endif %}"
+            href="{% url 'handoff:sop_library' %}?id={{ sop.id }}"
+          >
+            <div class="fw-semibold">{{ sop.name }}</div>
+            {% if sop.context_route %}
+              <div class="small opacity-75">{{ sop.context_route }}</div>
+            {% endif %}
+          </a>
+        {% empty %}
+          <div class="list-group-item">
+            No SOPs yet. Add them in Admin -> SOP Guides.
+          </div>
+        {% endfor %}
+      </div>
+    </div>
+
+    <div class="col-12 col-lg-8">
+      {% if selected_sop %}
+        <div class="card shadow-sm">
+          <div class="card-header d-flex justify-content-between align-items-center">
+            <div class="fw-semibold">{{ selected_sop.name }}</div>
+            <span class="badge text-bg-secondary">Scribe</span>
+          </div>
+          <div class="card-body p-0">
+            <iframe
+              src="{{ selected_embed_url }}"
+              style="width: 100%; height: 70vh; border: 0;"
+              allowfullscreen
+              loading="lazy"
+            ></iframe>
+          </div>
+        </div>
+      {% else %}
+        <div class="alert alert-secondary">
+          Select a guide to view it here.
+        </div>
+      {% endif %}
+    </div>
+  </div>
+{% endblock %}

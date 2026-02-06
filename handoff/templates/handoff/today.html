@@ -18,7 +18,7 @@
         <div class="col-12">
           <a
             class="card shadow-sm text-decoration-none text-reset"
-            href="{% url 'handoff:task_detail' task.id %}"
+            href="{% url 'handoff:task_detail' task.id %}{% if store %}?store={{ store.id }}{% endif %}"
           >
             <div class="card-body">
               <div class="d-flex justify-content-between align-items-center gap-3">
@@ -26,13 +26,13 @@
                   {% if task.drive_design_file_id %}
                     <div
                       class="rounded border d-flex align-items-center justify-content-center"
-                      style="width: 56px; height: 56px; background: #000;"
+                      style="width: 56px; height: 56px; background: #000; overflow: hidden;"
                     >
                       <img
                         src="https://drive.google.com/thumbnail?id={{ task.drive_design_file_id }}&sz=w200&t={{ task.updated_at|date:'U' }}"
                         alt="Design thumbnail"
                         class="rounded"
-                        style="width: 100%; height: 100%; object-fit: cover;"
+                        style="width: 100%; height: 100%; object-fit: cover; background: #000; display: block;"
                         loading="lazy"
                       />
                     </div>

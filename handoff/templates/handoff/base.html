@@ -59,23 +59,54 @@
     </style>
     <nav class="navbar navbar-expand-lg bg-white border-bottom">
       <div class="container">
-        <a class="navbar-brand fw-bold" href="{% url 'handoff:today' %}">
+        <a class="navbar-brand fw-bold" href="{% url 'handoff:today' %}{% if current_store %}?store={{ current_store.id }}{% endif %}">
           DAD - Design A Day
         </a>
-        <div class="d-flex gap-2">
-          <a class="btn btn-outline-primary btn-sm" href="{% url 'handoff:summary' %}">
+        <div class="d-flex align-items-center gap-2">
+          {% if store_options %}
+            <div class="d-flex align-items-center gap-1">
+              <label class="text-muted small" for="store-switcher">Store</label>
+              <select class="form-select form-select-sm" id="store-switcher">
+                <option value="">All</option>
+                {% for store in store_options %}
+                  <option value="{{ store.id }}" {% if current_store and store.id == current_store.id %}selected{% endif %}>
+                    {{ store.name }}
+                  </option>
+                {% endfor %}
+              </select>
+            </div>
+          {% endif %}
+          <a class="btn btn-outline-primary btn-sm" href="{% url 'handoff:summary' %}{% if current_store %}?store={{ current_store.id }}{% endif %}">
             Summary
           </a>
-          <a class="btn btn-primary btn-sm" href="{% url 'handoff:create_task' %}">
-            New Task
+          <a class="btn btn-outline-info btn-sm" href="{% url 'handoff:sop_library' %}">
+            SOPs
           </a>
-          <a class="btn btn-outline-secondary btn-sm" href="/admin/">Admin</a>
+          {% if request.user.is_staff %}
+            <a class="btn btn-outline-secondary btn-sm" href="/admin/">Admin</a>
+          {% endif %}
+          {% if request.user.is_authenticated %}
+            <span class="text-muted small">{{ request.user.get_username }}</span>
+            <form method="post" action="{% url 'logout' %}" class="mb-0">
+              {% csrf_token %}
+              <button type="submit" class="btn btn-outline-danger btn-sm">Logout</button>
+            </form>
+          {% else %}
+            <a class="btn btn-primary btn-sm" href="{% url 'login' %}">Login</a>
+          {% endif %}
         </div>
       </div>
     </nav>
 
     <main class="container py-4">
       <div id="csrf-token" class="d-none">{% csrf_token %}</div>
+      {% if runway and runway.below_threshold %}
+        <div class="alert {% if runway.days_remaining == 0 %}alert-danger{% else %}alert-warning{% endif %}">
+          {% if current_store %}{{ current_store.name }} runway low:{% else %}Runway low:{% endif %}
+          {{ runway.days_remaining }} day{% if runway.days_remaining != 1 %}s{% endif %} remaining
+          {% if runway.exhaustion_date %}(last date {{ runway.exhaustion_date|date:"M j, Y" }}){% endif %}.
+        </div>
+      {% endif %}
       {% if messages %}
         {% for message in messages %}
           <div class="alert alert-{% if message.tags == 'error' %}danger{% else %}{{ message.tags }}{% endif %}">
@@ -94,6 +125,22 @@
         if (token) {
           event.detail.headers["X-CSRFToken"] = token.value;
         }
+      });
+    </script>
+
+    <script>
+      document.addEventListener("DOMContentLoaded", () => {
+        const selector = document.getElementById("store-switcher");
+        if (!selector) return;
+        selector.addEventListener("change", () => {
+          const url = new URL(window.location.href);
+          if (selector.value) {
+            url.searchParams.set("store", selector.value);
+          } else {
+            url.searchParams.delete("store");
+          }
+          window.location.href = url.toString();
+        });
       });
     </script>
 
@@ -139,7 +186,13 @@
               });
           };
 
-          slot.addEventListener("click", () => input.click());
+          slot.addEventListener("click", (event) => {
+            const target = event.target;
+            if (target && target.closest && target.closest("a,button,input,select,textarea,label")) {
+              return;
+            }
+            input.click();
+          });
           input.addEventListener("change", (event) => {
             upload(event.target.files[0]);
           });
@@ -244,125 +297,158 @@
     </script>
 
     <script>
-      async function getStoredHandle() {
-        if (!("indexedDB" in window)) return null;
-        return new Promise((resolve) => {
-          const request = indexedDB.open("dad_mockup_handles", 1);
-          request.onupgradeneeded = () => {
-            const db = request.result;
-            db.createObjectStore("handles");
-          };
-          request.onsuccess = () => {
-            const db = request.result;
-            const tx = db.transaction("handles", "readonly");
-            const store = tx.objectStore("handles");
-            const getReq = store.get("mockup_folder");
-            getReq.onsuccess = () => resolve(getReq.result || null);
-            getReq.onerror = () => resolve(null);
-          };
-          request.onerror = () => resolve(null);
-        });
-      }
-
-      async function saveHandle(handle) {
-        if (!("indexedDB" in window)) return;
-        const request = indexedDB.open("dad_mockup_handles", 1);
-        request.onupgradeneeded = () => {
-          const db = request.result;
-          db.createObjectStore("handles");
-        };
-        request.onsuccess = () => {
-          const db = request.result;
-          const tx = db.transaction("handles", "readwrite");
-          const store = tx.objectStore("handles");
-          store.put(handle, "mockup_folder");
-        };
-      }
-
-      async function pickFolder() {
-        if (!window.showDirectoryPicker) {
-          alert("Folder picker not supported in this browser. Use Chrome or Edge.");
-          return null;
-        }
-        const handle = await window.showDirectoryPicker();
-        await saveHandle(handle);
-        return handle;
-      }
-
-      async function ensureFolderHandle() {
-        let handle = await getStoredHandle();
-        if (handle) {
-          const perm = await handle.queryPermission({ mode: "readwrite" });
-          if (perm === "granted") return handle;
-        }
-        return await pickFolder();
-      }
-
-      async function saveAllMockups(taskId, statusEl, barEl, textEl, saveBtn) {
-        const handle = await ensureFolderHandle();
-        if (!handle) return;
-        if (statusEl) statusEl.classList.remove("d-none");
-        if (barEl) {
-          barEl.style.width = "0%";
-          barEl.setAttribute("aria-valuenow", "0");
-        }
-        if (textEl) textEl.textContent = "Fetching list...";
-        if (saveBtn) saveBtn.disabled = true;
-
-        try {
-          const filesResp = await fetch(`/task/${taskId}/mockups/files/`);
-          const payload = await filesResp.json();
-          const total = payload.files ? payload.files.length : 0;
-          if (!total) {
-            if (textEl) textEl.textContent = "No mockups to save.";
-            if (barEl) {
-              barEl.style.width = "100%";
-              barEl.setAttribute("aria-valuenow", "100");
-            }
-            return;
-          }
-          let done = 0;
-          for (const file of payload.files) {
-            if (textEl) textEl.textContent = `Saving ${done + 1} of ${total}...`;
-            const res = await fetch(`/mockup/file/${file.file_id}/download/`);
-            const blob = await res.blob();
-            const fileHandle = await handle.getFileHandle(file.filename, { create: true });
-            const writable = await fileHandle.createWritable();
-            await writable.write(blob);
-            await writable.close();
-            done += 1;
-            const percent = Math.round((done / total) * 100);
-            if (barEl) {
-              barEl.style.width = percent + "%";
-              barEl.setAttribute("aria-valuenow", String(percent));
-            }
-          }
-          if (textEl) textEl.textContent = "All mockups saved.";
-        } catch (err) {
-          if (textEl) textEl.textContent = "Save failed. Please try again.";
-        } finally {
-          if (saveBtn) saveBtn.disabled = false;
-        }
-      }
-
       document.addEventListener("DOMContentLoaded", () => {
-        const chooseBtn = document.getElementById("choose-mockup-folder");
-        const saveBtn = document.getElementById("save-all-mockups");
-        const statusEl = document.getElementById("mockup-save-status");
-        const barEl = document.getElementById("mockup-save-bar");
-        const textEl = document.getElementById("mockup-save-text");
-        if (!chooseBtn || !saveBtn) return;
-        const stepsPanel = document.getElementById("steps-panel");
-        const taskId = stepsPanel ? stepsPanel.dataset.taskId : null;
-        chooseBtn.addEventListener("click", async () => {
-          await pickFolder();
-        });
-        saveBtn.addEventListener("click", async () => {
-          if (!taskId) return;
-          await saveAllMockups(taskId, statusEl, barEl, textEl, saveBtn);
+        const getCookie = (name) => {
+          const value = `; ${document.cookie}`;
+          const parts = value.split(`; ${name}=`);
+          if (parts.length === 2) {
+            return parts.pop().split(";").shift();
+          }
+          return null;
+        };
+
+        const form = document.getElementById("mockup-generate-form");
+        if (!form) return;
+        const statusEl = document.getElementById("mockup-generate-status");
+        const barEl = document.getElementById("mockup-generate-bar");
+        const textEl = document.getElementById("mockup-generate-text");
+        const button = form.querySelector('button[type="submit"]');
+        const csrfInput = form.querySelector('input[name="csrfmiddlewaretoken"]');
+        const taskId = form.dataset.taskId;
+
+        const refreshMockups = async () => {
+          const panel = document.getElementById("mockups-panel");
+          if (!panel || !taskId) return;
+          const resp = await fetch(`/task/${taskId}/mockups/`, { credentials: "same-origin" });
+          const html = await resp.text();
+          panel.outerHTML = html;
+          bindMockupSlots();
+        };
+
+        const updateProgress = (done, total) => {
+          if (!barEl || !textEl) return;
+          if (total > 0) {
+            const percent = Math.min(100, Math.round((done / total) * 100));
+            barEl.style.width = percent + "%";
+            barEl.setAttribute("aria-valuenow", String(percent));
+            textEl.textContent = `Generating ${done} of ${total} mockups...`;
+          } else {
+            barEl.style.width = "100%";
+            barEl.setAttribute("aria-valuenow", "100");
+            textEl.textContent = "Generating mockups...";
+          }
+        };
+
+        const pollStatus = async (jobId) => {
+          try {
+            const res = await fetch(
+              `/task/${taskId}/mockups/progress/?job=${jobId}`,
+              {
+                headers: { Accept: "application/json" },
+                credentials: "same-origin",
+              }
+            );
+            if (!res.ok) {
+              throw new Error("progress");
+            }
+            const payload = await res.json();
+            if (payload.status === "error") {
+              if (textEl) {
+                textEl.textContent = payload.error || "Mockup generation failed.";
+              }
+              if (button) button.disabled = false;
+              return;
+            }
+            updateProgress(payload.done || 0, payload.total || 0);
+            if (payload.status === "done") {
+              if (textEl) textEl.textContent = "Mockups generated.";
+              if (button) button.disabled = false;
+              await refreshMockups();
+              return;
+            }
+          } catch (err) {
+            if (textEl) textEl.textContent = "Checking progress...";
+          }
+          setTimeout(() => pollStatus(jobId), 1000);
+        };
+
+        form.addEventListener("submit", async (event) => {
+          event.preventDefault();
+          if (button && button.disabled) return;
+          if (statusEl) statusEl.classList.remove("d-none");
+          updateProgress(0, 0);
+          if (button) button.disabled = true;
+
+          const csrf = document.querySelector('input[name="csrfmiddlewaretoken"]');
+          const formData = new FormData(form);
+          try {
+          const csrfToken = (csrfInput && csrfInput.value) || getCookie("csrftoken");
+          const res = await fetch(form.action, {
+            method: "POST",
+            credentials: "same-origin",
+            headers: {
+              "X-Requested-With": "XMLHttpRequest",
+              Accept: "application/json",
+              ...(csrfToken ? { "X-CSRFToken": csrfToken } : {}),
+            },
+            body: formData,
+          });
+            if (!res.ok) {
+              const errText = await res.text();
+              if (textEl) {
+                textEl.textContent = errText || "Mockup generation failed.";
+              }
+              if (button) button.disabled = false;
+              return;
+            }
+            const payload = await res.json();
+            if (!payload.job_id) {
+              if (textEl) textEl.textContent = "Unable to start generation.";
+              if (button) button.disabled = false;
+              return;
+            }
+            updateProgress(0, payload.total || 0);
+            pollStatus(payload.job_id);
+          } catch (err) {
+            if (textEl) textEl.textContent = "Mockup generation failed.";
+            if (button) button.disabled = false;
+          }
         });
       });
     </script>
+
+    {% if active_sop %}
+      <button
+        class="btn btn-primary btn-sm position-fixed"
+        style="right: 24px; bottom: 24px; z-index: 1045;"
+        data-bs-toggle="offcanvas"
+        data-bs-target="#sopSidebar"
+        aria-controls="sopSidebar"
+      >
+        Need Help?
+      </button>
+
+      <div
+        class="offcanvas offcanvas-end"
+        tabindex="-1"
+        id="sopSidebar"
+        aria-labelledby="sopSidebarLabel"
+        style="width: min(540px, 92vw);"
+      >
+        <div class="offcanvas-header">
+          <h5 class="offcanvas-title" id="sopSidebarLabel">{{ active_sop.name }}</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="offcanvas" aria-label="Close"></button>
+        </div>
+        <div class="offcanvas-body p-0">
+          <iframe
+            src="{{ active_sop_embed_url }}"
+            style="width: 100%; height: 100%; min-height: 70vh; border: 0;"
+            allowfullscreen
+            loading="lazy"
+          ></iframe>
+        </div>
+      </div>
+    {% endif %}
 
   </body>
 </html>

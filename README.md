@@ -5,16 +5,17 @@ Small Django app for daily handoff tasks.
 ## Run
 
 ```powershell
-.\.venv\Scripts\python manage.py runserver
+.\.venv\Scripts\python manage.py runserver 0.0.0.0:8080
 ```
 
 On first run, `manage.py` auto-installs `requirements.txt` if anything is missing.
 Set `DAD_SKIP_PIP=1` to disable auto-install.
 
 Open:
-- `http://127.0.0.1:8000/` for the Dad view
-- `http://127.0.0.1:8000/admin/` for Admin
-- `http://127.0.0.1:8000/create/` for quick task creation
+- `http://127.0.0.1:8080/` for the Dad view
+- `http://127.0.0.1:8080/admin/` for Admin
+- `http://127.0.0.1:8080/create/` for quick task creation
+- `http://127.0.0.1:8080/task/<id>/etsy/` for an Etsy listing preview (copy/paste + tag tools)
 
 ## Deploy on Koyeb (with Postgres)
 
@@ -27,7 +28,8 @@ Koyeb’s filesystem is ephemeral, so SQLite will be wiped on restarts. Use Post
    - `DEBUG=false`
    - `DJANGO_ALLOWED_HOSTS` = your Koyeb domain (ex: `your-app.koyeb.app`)
    - `GOOGLE_DRIVE_ROOT_FOLDER_ID`
-   - `GOOGLE_DRIVE_CREDENTIALS_FILE` / `GOOGLE_DRIVE_TOKEN_FILE` if you store them on disk
+   - `GOOGLE_DRIVE_CREDENTIALS_JSON` (paste full OAuth client JSON)
+   - `GOOGLE_DRIVE_TOKEN_JSON` (paste full token JSON)
 3. Build command:
    ```
    pip install -r requirements.txt
@@ -122,3 +124,43 @@ If you previously pasted full Drive links into fields, run:
 ```powershell
 .\.venv\Scripts\python manage.py fix_drive_ids
 ```
+
+## AI tag generation (optional)
+
+The Etsy preview page can generate tags via OpenAI.
+
+Set env vars:
+- `OPENAI_API_KEY` (required)
+- `OPENAI_MODEL` (optional, default `gpt-4o-mini`)
+- `OPENAI_BASE_URL` (optional, default `https://api.openai.com`)
+
+Tags must validate as: exactly 13 tags, each under 20 characters, letters/numbers/spaces only.
+
+## Stores + per-store listing status
+
+Add stores in Admin -> Stores. Each task auto-creates a publication row per active store.
+In the Etsy preview screen you can set per-store status + listing URL and save it back into DAD.
+
+## Design Automation Roadmap (Planned)
+
+This will use the existing Django database configuration (local `db.sqlite3` or
+`DATABASE_URL` on Koyeb). No external alert channel; warnings will be shown in
+the Admin/Dad UI. Scheduling is every day (no skips).
+
+Data (Django DB):
+- `DesignFile`: filename, date_assigned, status, drive_file_id, size_mb, ext, source_folder, created_at, updated_at.
+- `DesignHistory`: design_file, posted_date, original_drive_file_id, notes.
+- `SOPGuide`: name, scribe_id_or_url, context_route, active, updated_at.
+- `SOPReplyTemplate`: name, trigger_keywords, reply_text, active, updated_at.
+
+Workflow:
+- Intake Engine: scan `/Dump_Zone`, validate PNG/JPG <= 20MB, find next available
+  date from `/Scheduled`, rename to `YYYY-MM-DD`, move to `/Scheduled`, insert/update
+  `DesignFile`. Invalid files go to `/Error` with reason logged.
+- Inventory Guard: compute runway from `/Scheduled` count and last date, return JSON
+  for Admin; show a warning banner when runway is low. No outbound alerts.
+- Daily Publish: load today’s file by date and feed Dad view (already done), mark `status=active`.
+- Cleanup & Archive: after posted, move from `/Scheduled` to `/Done`, update `status=posted`,
+  append to `DesignHistory`, avoid overwrite by timestamping duplicates.
+- Emergency Recycling (optional): if today’s file is missing, copy a random `/Done`
+  file into the active slot and mark `status=recycled`, plus a UI warning banner.

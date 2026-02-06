@@ -85,7 +85,14 @@ class TaskTemplateForm(forms.ModelForm):
 
     class Meta:
         model = TaskTemplate
-        fields = ["name", "default_steps", "default_video_url", "sample_design_drive_file_id"]
+        fields = [
+            "name",
+            "default_steps",
+            "default_video_url",
+            "sample_design_drive_file_id",
+            "etsy_title_suffix",
+            "etsy_description_default",
+        ]
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)

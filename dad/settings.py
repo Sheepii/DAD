@@ -70,6 +70,7 @@ TEMPLATES = [
                 'django.template.context_processors.request',
                 'django.contrib.auth.context_processors.auth',
                 'django.contrib.messages.context_processors.messages',
+                'handoff.context_processors.handoff_context',
             ],
         },
     },
@@ -131,7 +132,13 @@ USE_TZ = True
 STATIC_URL = 'static/'
 STATIC_ROOT = BASE_DIR / "staticfiles"
 
+LOGIN_REDIRECT_URL = "/today/"
+LOGOUT_REDIRECT_URL = "/accounts/login/"
+
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+
+# Design runway warning threshold (days)
+DESIGN_RUNWAY_THRESHOLD = int(os.environ.get("DESIGN_RUNWAY_THRESHOLD", "5"))
 
 # Google Drive configuration
 GOOGLE_DRIVE_ROOT_FOLDER_ID = os.environ.get("GOOGLE_DRIVE_ROOT_FOLDER_ID", "")

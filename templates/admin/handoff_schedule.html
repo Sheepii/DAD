@@ -77,10 +77,30 @@
 
   <div class="module">
     <h1>Design Schedule</h1>
+    {% if runway and runway.below_threshold %}
+      <ul class="messagelist">
+        <li class="{% if runway.days_remaining == 0 %}error{% else %}warning{% endif %}">
+          Runway low: {{ runway.days_remaining }} day{% if runway.days_remaining != 1 %}s{% endif %} remaining
+          {% if runway.exhaustion_date %}(last date {{ runway.exhaustion_date|date:"M j, Y" }}){% endif %}.
+        </li>
+      </ul>
+    {% endif %}
     <div class="schedule-toolbar">
-      <a class="button" href="?month={{ prev_month }}{{ task_query }}">&#8592; Prev</a>
+      <a class="button" href="?month={{ prev_month }}{{ task_query }}{{ store_query }}">&#8592; Prev</a>
       <strong>{{ month_label }}</strong>
-      <a class="button" href="?month={{ next_month }}{{ task_query }}">Next &#8594;</a>
+      <a class="button" href="?month={{ next_month }}{{ task_query }}{{ store_query }}">Next &#8594;</a>
+      <form method="post" action="{% url 'admin:handoff_intake_designs' %}">
+        {% csrf_token %}
+        <button class="button" type="submit">Run Intake</button>
+      </form>
+      <form method="post" action="{% url 'admin:handoff_emergency_recycle' %}">
+        {% csrf_token %}
+        {% if selected_store %}
+          <input type="hidden" name="store_id" value="{{ selected_store.id }}">
+        {% endif %}
+        <button class="button" type="submit">Emergency Recycle Today</button>
+      </form>
+      <a class="button" href="{% url 'admin:handoff_mockup_studio' %}">Mockup Studio</a>
       <form method="get" style="margin-left:auto;display:flex;gap:8px;align-items:center;">
         <input type="hidden" name="month" value="{{ month_value }}">
         <label>Task</label>
@@ -89,6 +109,15 @@
           {% for task in recurring_tasks %}
             <option value="{{ task.id }}" {% if selected_task and task.id == selected_task.id %}selected{% endif %}>
               {{ task.title }}
+            </option>
+          {% endfor %}
+        </select>
+        <label>Store</label>
+        <select name="store" onchange="this.form.submit()">
+          <option value="">All stores</option>
+          {% for store in stores %}
+            <option value="{{ store.id }}" {% if selected_store and store.id == selected_store.id %}selected{% endif %}>
+              {{ store.name }}
             </option>
           {% endfor %}
         </select>
@@ -103,7 +132,7 @@
         {% for day in week %}
           <div class="schedule-cell {% if not day.in_month %}is-outside{% endif %}" data-date="{{ day.date|date:'Y-m-d' }}">
             <div class="schedule-date">
-              <a href="?month={{ month_value }}&date={{ day.date|date:'Y-m-d' }}{{ task_query }}">
+              <a href="?month={{ month_value }}&date={{ day.date|date:'Y-m-d' }}{{ task_query }}{{ store_query }}">
                 {{ day.date|date:"j" }}
               </a>
               {% if day.scheduled_items %}
@@ -117,6 +146,7 @@
                   data-schedule-id="{{ item.id }}"
                   data-design-id="{{ item.design_id }}"
                   data-task-id="{{ item.task_id }}"
+                  data-store-id="{{ item.store_id }}"
                   title="Double-click to edit"
                 >
                   <img class="schedule-thumb" src="{{ item.thumb }}" alt="Design preview">
@@ -156,6 +186,17 @@
         </select>
       </div>
       <div class="form-row">
+        <label>Store (optional)</label>
+        <select name="store_id">
+          <option value="">All stores</option>
+          {% for store in stores %}
+            <option value="{{ store.id }}" {% if selected_store and store.id == selected_store.id %}selected{% endif %}>
+              {{ store.name }}
+            </option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="form-row">
         <label>Upload design from your PC</label>
         <input type="file" name="design_upload" style="width:100%;" />
       </div>
@@ -183,6 +224,17 @@
           {% for task in recurring_tasks %}
             <option value="{{ task.id }}" {% if selected_task and task.id == selected_task.id %}selected{% endif %}>
               {{ task.title }}
+            </option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="form-row">
+        <label>Store (optional)</label>
+        <select name="store_id" id="schedule-dialog-store">
+          <option value="">All stores</option>
+          {% for store in stores %}
+            <option value="{{ store.id }}" {% if selected_store and store.id == selected_store.id %}selected{% endif %}>
+              {{ store.name }}
             </option>
           {% endfor %}
         </select>
@@ -238,6 +290,9 @@
       const cancelBtn = document.getElementById("schedule-dialog-cancel");
       const taskFilter = document.querySelector('select[name="task"]');
       const taskFilterValue = taskFilter ? taskFilter.value : "";
+      const storeFilter = document.querySelector('select[name="store"]');
+      const storeFilterValue = storeFilter ? storeFilter.value : "";
+      const dialogStore = document.getElementById("schedule-dialog-store");
 
       const openDialogForCell = (cell, event) => {
         event.preventDefault();
@@ -248,6 +303,9 @@
         dialogDateLabel.value = date;
         if (dialogTask && taskFilterValue) {
           dialogTask.value = taskFilterValue;
+        }
+        if (dialogStore && storeFilterValue) {
+          dialogStore.value = storeFilterValue;
         }
         if (dialogDesign) dialogDesign.value = "";
         if (dialogRemove) dialogRemove.checked = false;
@@ -284,6 +342,9 @@
           dialogDateLabel.value = date;
           if (dialogTask) {
             dialogTask.value = item.dataset.taskId || "";
+          }
+          if (dialogStore) {
+            dialogStore.value = item.dataset.storeId || "";
           }
           if (dialogDesign) {
             dialogDesign.value = item.dataset.designId || "";
@@ -330,7 +391,7 @@
               try {
                 const payload = JSON.parse(xhr.responseText);
                 if (payload.status === "deleted") {
-                  removeScheduleItem(cell, payload.task_id);
+                  removeScheduleItem(cell, payload.task_id, payload.store_id);
                 } else if (payload.status === "saved") {
                   upsertScheduleItem(cell, payload.item);
                 }
@@ -376,16 +437,24 @@
         if (badge) badge.textContent = String(count);
       }
 
+      function itemSelector(taskId, storeId) {
+        const task = taskId || "";
+        const store = storeId || "";
+        return `.schedule-item[data-task-id="${task}"][data-store-id="${store}"]`;
+      }
+
       function upsertScheduleItem(cell, item) {
         if (!cell || !item) return;
         const itemsWrap = cell.querySelector(".schedule-items");
         if (!itemsWrap) return;
         const taskId = item.task_id || "";
-        let existing = itemsWrap.querySelector(`.schedule-item[data-task-id="${taskId}"]`);
+        const storeId = item.store_id || "";
+        let existing = itemsWrap.querySelector(itemSelector(taskId, storeId));
         if (!existing) {
           existing = document.createElement("div");
           existing.className = "schedule-item";
           existing.dataset.taskId = taskId;
+          existing.dataset.storeId = storeId;
           existing.dataset.scheduleId = item.id || "";
           existing.dataset.designId = item.design_id || "";
           existing.innerHTML =
@@ -400,6 +469,7 @@
             dialogDate.value = date;
             dialogDateLabel.value = date;
             if (dialogTask) dialogTask.value = taskId;
+            if (dialogStore) dialogStore.value = storeId;
             if (dialogDesign) dialogDesign.value = item.design_id || "";
             if (dialogRemove) dialogRemove.checked = false;
             if (dialogExisting) dialogExisting.classList.remove("d-none");
@@ -410,6 +480,7 @@
         } else {
           existing.dataset.scheduleId = item.id || "";
           existing.dataset.designId = item.design_id || "";
+          existing.dataset.storeId = storeId;
           const img = existing.querySelector("img");
           if (img) img.src = item.thumb;
           const label = existing.querySelector("div div");
@@ -418,12 +489,11 @@
         updateBadge(cell);
       }
 
-      function removeScheduleItem(cell, taskId) {
+      function removeScheduleItem(cell, taskId, storeId) {
         if (!cell) return;
         const itemsWrap = cell.querySelector(".schedule-items");
         if (!itemsWrap) return;
-        const selector = `.schedule-item[data-task-id="${taskId || ""}"]`;
-        const existing = itemsWrap.querySelector(selector);
+        const existing = itemsWrap.querySelector(itemSelector(taskId || "", storeId || ""));
         if (existing) existing.remove();
         updateBadge(cell);
       }

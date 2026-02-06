@@ -4,27 +4,39 @@
   data-slot-id="{{ slot.id }}"
 >
   {% if slot.drive_file_id %}
-    <img
-      src="https://drive.google.com/thumbnail?id={{ slot.drive_file_id }}&sz=w300&t={{ slot.updated_at|date:'U' }}"
-      alt="Mockup {{ slot.order }}"
-      class="img-fluid rounded mb-2"
-      style="background: #000; object-fit: cover;"
-      loading="lazy"
-    />
+    <a
+      href="{% url 'handoff:mockup_file_download' slot.drive_file_id %}"
+      download="{% if slot.filename %}{{ slot.filename }}{% else %}mockup-{{ slot.order }}.png{% endif %}"
+      class="d-block text-decoration-none"
+    >
+      <img
+        src="https://drive.google.com/thumbnail?id={{ slot.drive_file_id }}&sz=w300&t={{ slot.updated_at|date:'U' }}"
+        alt="Mockup {{ slot.order }}"
+        class="img-fluid rounded mb-2"
+        style="background: #000; object-fit: cover; display: block;"
+        loading="lazy"
+      />
+    </a>
   {% elif fallback_image_id %}
-    <img
-      src="https://drive.google.com/thumbnail?id={{ fallback_image_id }}&sz=w300&t={{ slot.updated_at|date:'U' }}"
-      alt="Mockup {{ slot.order }}"
-      class="img-fluid rounded mb-2"
-      style="background: #000; object-fit: cover; opacity: 0.85;"
-      loading="lazy"
-    />
+    <a
+      href="{% url 'handoff:mockup_file_download' fallback_image_id %}"
+      download="mockup-{{ slot.order }}.png"
+      class="d-block text-decoration-none"
+    >
+      <img
+        src="https://drive.google.com/thumbnail?id={{ fallback_image_id }}&sz=w300&t={{ slot.updated_at|date:'U' }}"
+        alt="Mockup {{ slot.order }}"
+        class="img-fluid rounded mb-2"
+        style="background: #000; object-fit: cover; opacity: 0.85; display: block;"
+        loading="lazy"
+      />
+    </a>
   {% else %}
     <div
       class="d-flex align-items-center justify-content-center rounded mb-2"
       style="width: 100%; aspect-ratio: 1 / 1; background: #000; color: #fff;"
     >
-      Drop mockup
+      No mockup
     </div>
   {% endif %}
 
@@ -41,30 +53,10 @@
   {% if slot.filename %}
     <div class="text-muted small">{{ slot.filename }}</div>
   {% endif %}
-  {% if slot.drive_file_id %}
-    <div class="d-flex gap-2 mt-2">
-      <a
-        class="btn btn-sm btn-outline-secondary"
-        href="https://drive.google.com/file/d/{{ slot.drive_file_id }}/view"
-        target="_blank"
-        rel="noopener"
-      >
-        Open
-      </a>
-      <a
-        class="btn btn-sm btn-outline-primary"
-        href="https://drive.google.com/uc?export=download&id={{ slot.drive_file_id }}"
-      >
-        Download
-      </a>
-    </div>
-  {% endif %}
   {% if required_orders|get_item:slot.order and not slot.drive_file_id %}
     <div class="text-muted small">Needs replacement</div>
   {% endif %}
   {% if error %}
     <div class="text-danger small mt-1">{{ error }}</div>
   {% endif %}
-
-  <input type="file" class="d-none mockup-input" accept="image/*" />
 </div>

@@ -1,5 +1,6 @@
 from django.db import models
 import re
+from django.conf import settings
 
 from django.utils import timezone
 
@@ -13,6 +14,15 @@ class TaskTemplate(models.Model):
     )
     default_video_url = models.URLField(blank=True)
     sample_design_drive_file_id = models.CharField(max_length=200, blank=True)
+    etsy_title_suffix = models.CharField(
+        max_length=50,
+        blank=True,
+        help_text="Appended to suggested Etsy titles, e.g. 'T-Shirt'.",
+    )
+    etsy_description_default = models.TextField(
+        blank=True,
+        help_text="Default Etsy description for this product type (template).",
+    )
 
     def __str__(self) -> str:
         return self.name
@@ -66,6 +76,17 @@ class Task(models.Model):
     drive_mockup_folder_id = models.CharField(max_length=200, blank=True)
     mockups_generated_design_id = models.CharField(max_length=200, blank=True)
     video_url = models.URLField(blank=True)
+    etsy_title = models.CharField(max_length=140, blank=True)
+    etsy_description = models.TextField(blank=True)
+    etsy_tags = models.JSONField(
+        blank=True,
+        null=True,
+        help_text="List of 13 tags (strings). Each tag must be under 20 characters.",
+    )
+    manual_done = models.BooleanField(
+        default=False,
+        help_text="Manual override for marking the task done (used for Dad view).",
+    )
     template = models.ForeignKey(
         TaskTemplate, on_delete=models.SET_NULL, null=True, blank=True
     )
@@ -96,6 +117,10 @@ class Task(models.Model):
         return total > 0 and self.done_steps == total
 
     def refresh_status(self) -> None:
+        if self.manual_done:
+            self.status = Task.STATUS_DONE
+            self.save(update_fields=["status", "updated_at"])
+            return
         if self.all_steps_done:
             self.status = Task.STATUS_DONE
         elif self.done_steps > 0:
@@ -126,6 +151,11 @@ class Task(models.Model):
         return len(created)
 
     def save(self, *args, **kwargs):
+        previous_status = None
+        if self.pk:
+            previous_status = (
+                Task.objects.filter(pk=self.pk).values_list("status", flat=True).first()
+            )
         if self.drive_design_file_id:
             self.drive_design_file_id = extract_drive_id(self.drive_design_file_id)
         if self.drive_mockup_folder_id:
@@ -133,12 +163,99 @@ class Task(models.Model):
                 self.drive_mockup_folder_id
             )
         super().save(*args, **kwargs)
+        if previous_status != Task.STATUS_DONE and self.status == Task.STATUS_DONE:
+            self.record_design_posted()
+
+    def record_design_posted(self) -> None:
+        drive_id = (self.drive_design_file_id or "").strip()
+        if not drive_id:
+            return
+        design = DesignFile.objects.filter(drive_file_id=drive_id).first()
+        store = design.store if design else None
+        if not store:
+            listed = (
+                self.publications.filter(status=TaskPublication.STATUS_LISTED)
+                .select_related("store")
+                .order_by("store__order", "store__name", "id")
+            )
+            if listed.count() == 1:
+                store = listed.first().store
+            else:
+                active = Store.objects.filter(active=True).order_by("order", "name")
+                if active.count() == 1:
+                    store = active.first()
+        if not store:
+            match = (
+                ScheduledDesign.objects.filter(
+                    due_date=self.due_date, drive_design_file_id=drive_id, store__isnull=False
+                )
+                .select_related("store")
+                .first()
+            )
+            if match:
+                store = match.store
+        if design:
+            updates = []
+            if design.status != DesignFile.STATUS_POSTED:
+                design.status = DesignFile.STATUS_POSTED
+                updates.append("status")
+            if not design.date_assigned:
+                design.date_assigned = self.due_date
+                updates.append("date_assigned")
+            if store and design.store_id != store.id:
+                design.store = store
+                updates.append("store")
+            if updates:
+                design.save(update_fields=updates + ["updated_at"])
+        exists = DesignHistory.objects.filter(
+            posted_date=self.due_date, original_drive_file_id=drive_id
+        ).exists()
+        if not exists:
+            DesignHistory.objects.create(
+                design_file=design,
+                posted_date=self.due_date,
+                original_drive_file_id=drive_id,
+                store=store,
+                notes=f"Task {self.id} marked done.",
+            )
+        try:
+            from .drive import archive_design_file
+
+            result = archive_design_file(drive_id, store=store)
+            if design and result.get("moved"):
+                updates = []
+                new_name = result.get("name")
+                if new_name and design.filename != new_name:
+                    design.filename = new_name
+                    updates.append("filename")
+                if design.source_folder != "Done":
+                    design.source_folder = "Done"
+                    updates.append("source_folder")
+                if updates:
+                    design.save(update_fields=updates + ["updated_at"])
+        except Exception:
+            # Never block the task flow if Drive is unavailable.
+            return
 
     def required_mockup_orders(self) -> set[int]:
-        return set()
+        if not self.template_id:
+            return set()
+        try:
+            orders = list(
+                self.template.mockup_templates.values_list("order", flat=True)
+            )
+        except Exception:
+            return set()
+        return {int(order) for order in orders if order}
 
     def required_mockups_done(self) -> bool:
-        return True
+        required = self.required_mockup_orders()
+        if not required:
+            return True
+        filled = set(
+            self.mockup_slots.exclude(drive_file_id="").values_list("order", flat=True)
+        )
+        return required.issubset({int(o) for o in filled if o})
 
     def ensure_mockup_slots(self, count: int = 6) -> None:
         existing = self.mockup_slots.count()
@@ -149,6 +266,22 @@ class Task(models.Model):
             for idx in range(existing, count)
         ]
         MockupSlot.objects.bulk_create(slots)
+
+    def ensure_publications(self) -> int:
+        stores = list(Store.objects.filter(active=True).order_by("order", "name"))
+        if not stores:
+            return 0
+        existing_store_ids = set(
+            TaskPublication.objects.filter(task=self).values_list("store_id", flat=True)
+        )
+        to_create = [
+            TaskPublication(task=self, store=store)
+            for store in stores
+            if store.id not in existing_store_ids
+        ]
+        if to_create:
+            TaskPublication.objects.bulk_create(to_create)
+        return len(to_create)
 
     class Meta:
         constraints = [
@@ -215,6 +348,74 @@ class TemplateAttachment(models.Model):
 
     def __str__(self) -> str:
         return self.label or self.filename or self.drive_file_id
+
+
+class Store(models.Model):
+    name = models.CharField(max_length=200, unique=True)
+    order = models.PositiveIntegerField(default=1)
+    active = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["order", "name", "id"]
+
+    def __str__(self) -> str:
+        return self.name
+
+
+class StoreMembership(models.Model):
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="store_memberships"
+    )
+    store = models.ForeignKey(
+        Store, on_delete=models.CASCADE, related_name="memberships"
+    )
+    active = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(fields=["user", "store"], name="unique_user_store_membership")
+        ]
+        ordering = ["store__order", "store__name", "user__username", "id"]
+
+    def __str__(self) -> str:
+        return f"{self.user} -> {self.store}"
+
+
+class TaskPublication(models.Model):
+    STATUS_QUEUED = "QUEUED"
+    STATUS_LISTED = "LISTED"
+
+    STATUS_CHOICES = [
+        (STATUS_QUEUED, "Queued"),
+        (STATUS_LISTED, "Listed"),
+    ]
+
+    task = models.ForeignKey(Task, on_delete=models.CASCADE, related_name="publications")
+    store = models.ForeignKey(Store, on_delete=models.CASCADE, related_name="publications")
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default=STATUS_QUEUED)
+    listing_url = models.URLField(blank=True)
+    listed_at = models.DateTimeField(null=True, blank=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["store__order", "store__name", "id"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["task", "store"],
+                name="unique_task_store_publication",
+            )
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.task} -> {self.store} ({self.status})"
+
+    def mark_listed_if_needed(self, was_listed: bool) -> None:
+        if self.status == self.STATUS_LISTED and not was_listed:
+            self.listed_at = timezone.now()
 
 
 class MockupSlot(models.Model):
@@ -301,6 +502,9 @@ class ScheduledDesign(models.Model):
         "RecurringTask", on_delete=models.CASCADE, null=True, blank=True
     )
     drive_design_file_id = models.CharField(max_length=200)
+    store = models.ForeignKey(
+        "Store", on_delete=models.SET_NULL, null=True, blank=True, related_name="scheduled_designs"
+    )
     created_at = models.DateTimeField(auto_now_add=True)
 
     def save(self, *args, **kwargs):
@@ -310,15 +514,94 @@ class ScheduledDesign(models.Model):
 
     def __str__(self) -> str:
         label = self.recurring_task.title if self.recurring_task else "All tasks"
-        return f"{label} - {self.due_date}"
+        store_label = f" ({self.store.name})" if self.store else ""
+        return f"{label}{store_label} - {self.due_date}"
 
     class Meta:
         constraints = [
             models.UniqueConstraint(
-                fields=["due_date", "recurring_task"],
-                name="unique_scheduled_design_per_day_task",
+                fields=["due_date", "recurring_task", "store"],
+                name="unique_scheduled_design_per_day_task_store",
             )
         ]
+
+
+class DesignFile(models.Model):
+    STATUS_DUMPED = "DUMPED"
+    STATUS_SCHEDULED = "SCHEDULED"
+    STATUS_ACTIVE = "ACTIVE"
+    STATUS_POSTED = "POSTED"
+    STATUS_ERROR = "ERROR"
+    STATUS_RECYCLED = "RECYCLED"
+
+    STATUS_CHOICES = [
+        (STATUS_DUMPED, "Dumped"),
+        (STATUS_SCHEDULED, "Scheduled"),
+        (STATUS_ACTIVE, "Active"),
+        (STATUS_POSTED, "Posted"),
+        (STATUS_ERROR, "Error"),
+        (STATUS_RECYCLED, "Recycled"),
+    ]
+
+    filename = models.CharField(max_length=255)
+    date_assigned = models.DateField(null=True, blank=True)
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES)
+    drive_file_id = models.CharField(max_length=200, blank=True)
+    store = models.ForeignKey(
+        "Store", on_delete=models.SET_NULL, null=True, blank=True, related_name="design_files"
+    )
+    size_mb = models.DecimalField(max_digits=6, decimal_places=2, default=0)
+    ext = models.CharField(max_length=10, blank=True)
+    source_folder = models.CharField(max_length=50, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def __str__(self) -> str:
+        return f"{self.filename} ({self.status})"
+
+
+class DesignHistory(models.Model):
+    design_file = models.ForeignKey(
+        DesignFile, on_delete=models.SET_NULL, null=True, blank=True, related_name="history"
+    )
+    posted_date = models.DateField()
+    original_drive_file_id = models.CharField(max_length=200, blank=True)
+    store = models.ForeignKey(
+        "Store", on_delete=models.SET_NULL, null=True, blank=True, related_name="design_history"
+    )
+    notes = models.TextField(blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self) -> str:
+        return f"{self.design_file or 'Design'} - {self.posted_date}"
+
+
+class SOPGuide(models.Model):
+    name = models.CharField(max_length=200)
+    scribe_id_or_url = models.CharField(max_length=300)
+    context_route = models.CharField(max_length=200, blank=True)
+    active = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def __str__(self) -> str:
+        return self.name
+
+
+class SOPReplyTemplate(models.Model):
+    name = models.CharField(max_length=200)
+    trigger_keywords = models.JSONField(
+        blank=True,
+        null=True,
+        help_text="List of keywords/phrases that match a customer message.",
+    )
+    reply_text = models.TextField()
+    active = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def __str__(self) -> str:
+        return self.name
 
 
 class AppSettings(models.Model):
@@ -406,6 +689,8 @@ class RecurringTask(models.Model):
                 )
             else:
                 task.seed_steps_from_template()
+        if created:
+            task.ensure_publications()
         return task, created
 
     @classmethod

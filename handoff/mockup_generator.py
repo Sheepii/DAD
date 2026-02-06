@@ -102,6 +102,15 @@ def render_mockup(
 def generate_mockup_for_template(task, template):
     design_name, design_mime, design_bytes = download_file_bytes(task.drive_design_file_id)
     _, design_bytes = convert_svg_bytes(design_name, design_mime, design_bytes)
+    png_bytes, filename = generate_mockup_bytes_for_template(
+        template, design_name, design_mime, design_bytes
+    )
+    file_id = upload_mockup_bytes(png_bytes, filename, due_date=task.due_date)
+    return file_id, filename
+
+
+def generate_mockup_bytes_for_template(template, design_name: str, design_mime: str, design_bytes: bytes):
+    _, design_bytes = convert_svg_bytes(design_name, design_mime, design_bytes)
     bg_name, bg_mime, background_bytes = download_file_bytes(template.background_drive_file_id)
     _, background_bytes = convert_svg_bytes(bg_name, bg_mime, background_bytes)
     overlay_bytes = None
@@ -133,8 +142,7 @@ def generate_mockup_for_template(task, template):
     )
     label = template.label or f"mockup-{template.order}"
     filename = f"{label}.png"
-    file_id = upload_mockup_bytes(png_bytes, filename, due_date=task.due_date)
-    return file_id, filename
+    return png_bytes, filename
 
 
 def preview_mockup_for_template(template, design_bytes: bytes):
