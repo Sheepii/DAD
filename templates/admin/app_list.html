@@ -56,7 +56,7 @@
                 <a href="/admin/handoff/schedule/">Design Schedule</a>
               </li>
               {% for model in app.models %}
-                {% if model.object_name|lower in "appsettings" %}
+                {% if model.object_name|lower in "appsettings,store,storemembership" %}
                   <li class="handoff-item">
                     <a href="{{ model.admin_url }}">{{ model.name }}</a>
                     {% if model.add_url %}<a class="addlink" href="{{ model.add_url }}">Add</a>{% endif %}
