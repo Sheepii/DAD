@@ -2,7 +2,7 @@
 <div id="mockups-panel">
   <h5 class="card-title">Mockups</h5>
   <div class="text-muted small mb-2">
-    Click a mockup image to download it.
+    Click a mockup image or static slide to download it.
   </div>
   <div class="mb-3">
     <a
@@ -22,47 +22,43 @@
         {% endwith %}
       </div>
     {% endfor %}
-  </div>
-
-  {% if zip_extras %}
-    <hr class="my-3" />
-    <h6 class="mb-2">Included In ZIP (not generated mockups)</h6>
-    <div class="row g-2">
-      {% for extra in zip_extras %}
-        <div class="col-6 col-md-4 col-lg-3">
-          <div class="border rounded p-2 h-100">
-            {% if extra.is_video %}
-              <video
-                controls
-                class="w-100 rounded mb-2"
-                style="background: #000; aspect-ratio: 1/1; object-fit: cover;"
-                preload="metadata"
-              >
-                <source src="{% url 'handoff:mockup_file_download' extra.drive_file_id %}" />
-              </video>
-            {% else %}
-              <a
-                href="{% url 'handoff:mockup_file_download' extra.drive_file_id %}"
-                download="{{ extra.filename }}"
-                class="d-block text-decoration-none"
-              >
-                <img
-                  src="https://drive.google.com/thumbnail?id={{ extra.drive_file_id }}&sz=w300"
-                  alt="{{ extra.label }}"
-                  class="img-fluid rounded mb-2"
-                  style="background: #000; object-fit: cover; display: block;"
-                  loading="lazy"
-                />
-              </a>
-            {% endif %}
-            <div class="small fw-semibold">{{ extra.label }}</div>
-            <div class="text-muted small">{{ extra.filename }}</div>
+    {% for extra in zip_extras %}
+      <div class="col-6 col-md-4 col-lg-3">
+        <div class="border rounded p-2 h-100">
+          {% if extra.is_video %}
+            <video
+              controls
+              class="w-100 rounded mb-2"
+              style="background: #000; aspect-ratio: 1/1; object-fit: cover;"
+              preload="metadata"
+            >
+              <source src="{% url 'handoff:mockup_file_download' extra.drive_file_id %}" />
+            </video>
+          {% else %}
+            <a
+              href="{% url 'handoff:mockup_file_download' extra.drive_file_id %}"
+              download="{{ extra.filename }}"
+              class="d-block text-decoration-none"
+            >
+              <img
+                src="https://drive.google.com/thumbnail?id={{ extra.drive_file_id }}&sz=w300"
+                alt="{{ extra.label }}"
+                class="img-fluid rounded mb-2"
+                style="background: #000; object-fit: cover; display: block;"
+                loading="lazy"
+              />
+            </a>
+          {% endif %}
+          <div class="small fw-semibold">{{ extra.label }}</div>
+          <div class="text-muted small">{{ extra.filename }}</div>
+          <div class="small">
+            <span class="badge bg-secondary">Static</span>
             {% if not extra.include_in_mockup_zip %}
-              <div class="text-warning small">Visible only (not included in ZIP)</div>
+              <span class="badge bg-warning text-dark">Visible only</span>
             {% endif %}
           </div>
         </div>
-      {% endfor %}
-    </div>
-  {% endif %}
+      </div>
+    {% endfor %}
+  </div>
 </div>
