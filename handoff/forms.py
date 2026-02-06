@@ -228,6 +228,10 @@ class TemplateAttachmentForm(forms.ModelForm):
 
     def clean_drive_file_id(self):
         value = (self.cleaned_data.get("drive_file_id") or "").strip()
+        uploaded = self.files.get(self.add_prefix("attachment_upload"))
+        if uploaded:
+            # File upload takes precedence; Drive ID will be set after upload.
+            return ""
         value = extract_drive_id(value)
         if not value:
             return ""
