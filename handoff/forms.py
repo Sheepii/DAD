@@ -1,4 +1,5 @@
 import json
+import re
 
 from django import forms
 from django.contrib.auth import get_user_model
@@ -224,3 +225,13 @@ class TemplateAttachmentForm(forms.ModelForm):
         if not uploaded and not drive_file_id:
             self.add_error("drive_file_id", "Upload a file or enter a Drive file ID.")
         return cleaned
+
+    def clean_drive_file_id(self):
+        value = (self.cleaned_data.get("drive_file_id") or "").strip()
+        value = extract_drive_id(value)
+        if not value:
+            return ""
+        # Google Drive IDs are URL-safe tokens; short numeric placeholders are invalid.
+        if not re.match(r"^[A-Za-z0-9_-]{15,}$", value):
+            raise forms.ValidationError("Enter a valid Google Drive file ID or upload a file.")
+        return value

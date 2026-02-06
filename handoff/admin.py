@@ -460,6 +460,8 @@ class TemplateAttachmentInline(admin.TabularInline):
     def attachment_preview(self, obj):
         if not obj.drive_file_id:
             return ""
+        if len(obj.drive_file_id.strip()) < 15:
+            return mark_safe('<span style="color:#d9534f;">Invalid Drive ID</span>')
         url = f"https://drive.google.com/thumbnail?id={obj.drive_file_id}&sz=w240"
         return mark_safe(
             f'<img src="{url}" style="width:80px;height:80px;object-fit:cover;border:1px solid #ddd;border-radius:6px;background:#000;" />'
@@ -470,6 +472,8 @@ class TemplateAttachmentInline(admin.TabularInline):
     def attachment_link(self, obj):
         if not obj.drive_file_id:
             return ""
+        if len(obj.drive_file_id.strip()) < 15:
+            return mark_safe('<span style="color:#d9534f;">Invalid Drive ID</span>')
         url = f"https://drive.google.com/file/d/{obj.drive_file_id}/view"
         return mark_safe(f'<a href="{url}" target="_blank" rel="noopener">Open file</a>')
 
@@ -600,6 +604,8 @@ class TaskTemplateAdmin(admin.ModelAdmin):
     def save_formset(self, request, form, formset, change):
         instances = formset.save(commit=False)
         if formset.model is MockupTemplate:
+            for obj in formset.deleted_objects:
+                obj.delete()
             for inline_form in formset.forms:
                 if inline_form.cleaned_data.get("DELETE"):
                     continue
@@ -648,6 +654,8 @@ class TaskTemplateAdmin(admin.ModelAdmin):
             formset.save_m2m()
             return
         if formset.model is TemplateAttachment:
+            for obj in formset.deleted_objects:
+                obj.delete()
             for inline_form in formset.forms:
                 if inline_form.cleaned_data.get("DELETE"):
                     continue
@@ -672,6 +680,8 @@ class TaskTemplateAdmin(admin.ModelAdmin):
                 instance.save()
             formset.save_m2m()
             return
+        for obj in formset.deleted_objects:
+            obj.delete()
         for instance in instances:
             instance.save()
         formset.save_m2m()
