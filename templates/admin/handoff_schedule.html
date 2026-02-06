@@ -91,8 +91,24 @@
       <a class="button" href="?month={{ next_month }}{{ task_query }}{{ store_query }}">Next &#8594;</a>
       <form method="post" action="{% url 'admin:handoff_intake_designs' %}">
         {% csrf_token %}
+        {% if selected_store %}
+          <input type="hidden" name="store_id" value="{{ selected_store.id }}">
+        {% endif %}
         <button class="button" type="submit">Run Intake</button>
       </form>
+      <form method="post" action="{% url 'admin:handoff_deploy_latest' %}">
+        {% csrf_token %}
+        <button class="button" type="submit">Deploy Latest</button>
+      </form>
+      {% if selected_store %}
+        <a class="button" href="{% url 'admin:handoff_open_dump_folder' %}?store={{ selected_store.id }}">
+          Open {{ selected_store.name }} Dump Folder
+        </a>
+      {% else %}
+        <a class="button disabled" href="#" onclick="return false;" title="Select a store first">
+          Open Store Dump Folder
+        </a>
+      {% endif %}
       <form method="post" action="{% url 'admin:handoff_emergency_recycle' %}">
         {% csrf_token %}
         {% if selected_store %}

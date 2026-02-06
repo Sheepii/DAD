@@ -11,16 +11,6 @@
     >
       Download ZIP
     </a>
-    {% if mockups_folder_id %}
-      <a
-        class="btn btn-outline-secondary btn-sm"
-        href="https://drive.google.com/drive/folders/{{ mockups_folder_id }}"
-        target="_blank"
-        rel="noopener"
-      >
-        Open Mockups Folder
-      </a>
-    {% endif %}
   </div>
   <div class="row g-2">
     {% for slot in task.mockup_slots.all %}
@@ -33,4 +23,43 @@
       </div>
     {% endfor %}
   </div>
+
+  {% if zip_extras %}
+    <hr class="my-3" />
+    <h6 class="mb-2">Included In ZIP (not generated mockups)</h6>
+    <div class="row g-2">
+      {% for extra in zip_extras %}
+        <div class="col-6 col-md-4 col-lg-3">
+          <div class="border rounded p-2 h-100">
+            {% if extra.is_video %}
+              <video
+                controls
+                class="w-100 rounded mb-2"
+                style="background: #000; aspect-ratio: 1/1; object-fit: cover;"
+                preload="metadata"
+              >
+                <source src="{% url 'handoff:mockup_file_download' extra.drive_file_id %}" />
+              </video>
+            {% else %}
+              <a
+                href="{% url 'handoff:mockup_file_download' extra.drive_file_id %}"
+                download="{{ extra.filename }}"
+                class="d-block text-decoration-none"
+              >
+                <img
+                  src="https://drive.google.com/thumbnail?id={{ extra.drive_file_id }}&sz=w300"
+                  alt="{{ extra.label }}"
+                  class="img-fluid rounded mb-2"
+                  style="background: #000; object-fit: cover; display: block;"
+                  loading="lazy"
+                />
+              </a>
+            {% endif %}
+            <div class="small fw-semibold">{{ extra.label }}</div>
+            <div class="text-muted small">{{ extra.filename }}</div>
+          </div>
+        </div>
+      {% endfor %}
+    </div>
+  {% endif %}
 </div>

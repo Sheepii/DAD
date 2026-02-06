@@ -291,12 +291,28 @@ def _build_mockup_context(task: Task) -> dict:
         mockups_folder_id = get_mockups_folder_id(task.due_date)
     except Exception:
         mockups_folder_id = ""
+    zip_extras = []
+    if task.template_id:
+        for attachment in task.template.attachments.filter(include_in_mockup_zip=True).exclude(drive_file_id=""):
+            filename = attachment.filename or attachment.label or f"extra-{attachment.id}"
+            guessed_type, _ = mimetypes.guess_type(filename)
+            is_video = bool(guessed_type and guessed_type.startswith("video/"))
+            zip_extras.append(
+                {
+                    "id": attachment.id,
+                    "label": attachment.label or filename,
+                    "filename": filename,
+                    "drive_file_id": attachment.drive_file_id,
+                    "is_video": is_video,
+                }
+            )
     return {
         "slot_images": slot_images,
         "folder_error": folder_error,
         "required_orders": {order: True for order in task.required_mockup_orders()},
         "has_mockup_templates": has_mockup_templates,
         "mockups_folder_id": mockups_folder_id,
+        "zip_extras": zip_extras,
     }
 
 

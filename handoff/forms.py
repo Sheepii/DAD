@@ -1,9 +1,17 @@
 import json
 
 from django import forms
+from django.contrib.auth import get_user_model
 from django.utils import timezone
 
-from .models import MockupTemplate, RecurringTask, Task, TaskTemplate, extract_drive_id
+from .models import (
+    MockupTemplate,
+    RecurringTask,
+    Task,
+    TaskTemplate,
+    TemplateAttachment,
+    extract_drive_id,
+)
 
 
 def _steps_to_text(steps) -> str:
@@ -106,6 +114,7 @@ class TaskTemplateForm(forms.ModelForm):
 
 
 class RecurringTaskForm(forms.ModelForm):
+    assigned_to = forms.ChoiceField(label="Assigned to")
     default_steps = StepListField(
         label="Default steps (one per line)",
         required=False,
@@ -132,6 +141,18 @@ class RecurringTaskForm(forms.ModelForm):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        user_model = get_user_model()
+        users = user_model.objects.filter(is_active=True).order_by("username")
+        choices = [(user.username, user.get_username()) for user in users]
+        current_assignee = (self.initial.get("assigned_to") or getattr(self.instance, "assigned_to", "") or "").strip()
+        if current_assignee and current_assignee not in {value for value, _ in choices}:
+            choices.insert(0, (current_assignee, f"{current_assignee} (legacy)"))
+        if choices:
+            self.fields["assigned_to"].choices = choices
+        else:
+            self.fields["assigned_to"].choices = [("Dad", "Dad")]
+        if not self.initial.get("assigned_to"):
+            self.initial["assigned_to"] = choices[0][0] if choices else "Dad"
         if self.instance and self.instance.default_steps:
             self.initial["default_steps"] = _steps_to_text(self.instance.default_steps)
         if not self.initial.get("start_date"):
@@ -145,6 +166,9 @@ class RecurringTaskForm(forms.ModelForm):
     def clean_drive_design_file_id(self):
         value = self.cleaned_data.get("drive_design_file_id", "")
         return extract_drive_id(value)
+
+    def clean_assigned_to(self):
+        return (self.cleaned_data.get("assigned_to") or "").strip()
 
 
 class MockupTemplateForm(forms.ModelForm):
@@ -182,4 +206,12 @@ class TaskAdminForm(forms.ModelForm):
 
     class Meta:
         model = Task
+        fields = "__all__"
+
+
+class TemplateAttachmentForm(forms.ModelForm):
+    attachment_upload = forms.FileField(required=False, label="Upload file")
+
+    class Meta:
+        model = TemplateAttachment
         fields = "__all__"

@@ -1,4 +1,5 @@
 from django.contrib import admin, messages
+from django.conf import settings
 
 from django.utils import timezone
 
@@ -10,8 +11,15 @@ import calendar
 import datetime
 from django.http import JsonResponse
 from django.core.management import call_command
+import subprocess
 
-from .forms import MockupTemplateForm, RecurringTaskForm, TaskTemplateForm, TaskAdminForm
+from .forms import (
+    MockupTemplateForm,
+    RecurringTaskForm,
+    TaskTemplateForm,
+    TaskAdminForm,
+    TemplateAttachmentForm,
+)
 from .context_processors import _compute_runway_status
 from .design_workflow import ensure_emergency_design
 from .mockup_generator import generate_mockup_bytes_for_template
@@ -36,7 +44,13 @@ from .models import (
     TemplateAttachment,
     extract_drive_id,
 )
-from .drive import upload_design_file, upload_template_asset_bytes
+from .drive import (
+    get_dump_zone_folder_id,
+    ensure_store_drive_folders,
+    upload_design_file,
+    upload_template_asset,
+    upload_template_asset_bytes,
+)
 import tempfile
 import os
 from .mockup_service import maybe_autogenerate_mockups
@@ -230,11 +244,79 @@ _orig_get_urls = admin.site.get_urls
 def intake_designs_view(request):
     if request.method != "POST":
         return redirect("/admin/handoff/schedule/")
+    store_id = request.POST.get("store_id")
+    store = None
+    if store_id:
+        try:
+            store = Store.objects.get(pk=int(store_id))
+        except (Store.DoesNotExist, ValueError):
+            store = None
     try:
-        call_command("intake_designs")
-        messages.success(request, "Intake complete. Check Design Files for results.")
+        if store:
+            call_command("intake_designs", store=str(store.id))
+            messages.success(
+                request,
+                f"Intake complete for {store.name}. Check Design Files for results.",
+            )
+        else:
+            call_command("intake_designs")
+            messages.success(request, "Intake complete. Check Design Files for results.")
     except Exception as exc:
         messages.error(request, f"Intake failed: {exc}")
+    return redirect("/admin/handoff/schedule/")
+
+
+def open_dump_folder_view(request):
+    store_id = request.GET.get("store")
+    store = None
+    if store_id:
+        try:
+            store = Store.objects.get(pk=int(store_id))
+        except (Store.DoesNotExist, ValueError):
+            store = None
+    try:
+        folder_id = get_dump_zone_folder_id(store=store)
+    except Exception as exc:
+        messages.error(request, f"Could not resolve dump folder: {exc}")
+        return redirect("/admin/handoff/schedule/")
+    return redirect(f"https://drive.google.com/drive/folders/{folder_id}")
+
+
+def deploy_latest_view(request):
+    if request.method != "POST":
+        return redirect("/admin/handoff/schedule/")
+
+    project_dir = str(settings.BASE_DIR)
+    commands = [
+        ("git pull", ["git", "pull", "origin", "main"]),
+        ("pip install", [r".\.venv\Scripts\python", "-m", "pip", "install", "-r", "requirements.txt"]),
+        ("migrate", [r".\.venv\Scripts\python", "manage.py", "migrate"]),
+    ]
+
+    for label, cmd in commands:
+        try:
+            result = subprocess.run(
+                cmd,
+                cwd=project_dir,
+                capture_output=True,
+                text=True,
+                check=True,
+            )
+            output = (result.stdout or "").strip()
+            if output:
+                lines = output.splitlines()
+                tail = " | ".join(lines[-2:])
+                messages.info(request, f"{label}: {tail}")
+        except subprocess.CalledProcessError as exc:
+            stderr = (exc.stderr or exc.stdout or "").strip()
+            short = " | ".join(stderr.splitlines()[-3:]) if stderr else "Unknown error"
+            messages.error(request, f"Deploy failed at {label}: {short}")
+            return redirect("/admin/handoff/schedule/")
+        except Exception as exc:
+            messages.error(request, f"Deploy failed at {label}: {exc}")
+            return redirect("/admin/handoff/schedule/")
+
+    messages.success(request, "Deploy completed: pull, dependencies, and migrations are up to date.")
     return redirect("/admin/handoff/schedule/")
 
 
@@ -337,6 +419,8 @@ def _get_urls():
     urls = _orig_get_urls()
     custom = [
         path("handoff/schedule/", admin.site.admin_view(handoff_schedule_view), name="handoff_schedule"),
+        path("handoff/deploy/", admin.site.admin_view(deploy_latest_view), name="handoff_deploy_latest"),
+        path("handoff/open-dump/", admin.site.admin_view(open_dump_folder_view), name="handoff_open_dump_folder"),
         path("handoff/intake/", admin.site.admin_view(intake_designs_view), name="handoff_intake_designs"),
         path("handoff/emergency/", admin.site.admin_view(emergency_recycle_view), name="handoff_emergency_recycle"),
         path("handoff/mockup-studio/", admin.site.admin_view(mockup_studio_view), name="handoff_mockup_studio"),
@@ -359,8 +443,15 @@ class AttachmentInline(admin.TabularInline):
 
 class TemplateAttachmentInline(admin.TabularInline):
     model = TemplateAttachment
+    form = TemplateAttachmentForm
     extra = 0
-    fields = ("label", "drive_file_id", "filename", "include_in_mockup_zip")
+    fields = (
+        "label",
+        "attachment_upload",
+        "drive_file_id",
+        "filename",
+        "include_in_mockup_zip",
+    )
 
 
 class MockupTemplateInline(admin.TabularInline):
@@ -528,6 +619,31 @@ class TaskTemplateAdmin(admin.ModelAdmin):
                             mime_type=uploaded.content_type or "image/png",
                         )
                         instance.mask_drive_file_id = file_id
+                instance.save()
+            formset.save_m2m()
+            return
+        if formset.model is TemplateAttachment:
+            for inline_form in formset.forms:
+                if inline_form.cleaned_data.get("DELETE"):
+                    continue
+                instance = inline_form.instance
+                uploaded = inline_form.files.get("attachment_upload")
+                if uploaded:
+                    temp_path = None
+                    try:
+                        if hasattr(uploaded, "temporary_file_path"):
+                            temp_path = uploaded.temporary_file_path()
+                        else:
+                            with tempfile.NamedTemporaryFile(delete=False) as temp:
+                                for chunk in uploaded.chunks():
+                                    temp.write(chunk)
+                                temp_path = temp.name
+                        file_id = upload_template_asset(temp_path, uploaded.name)
+                        instance.drive_file_id = file_id
+                        instance.filename = uploaded.name
+                    finally:
+                        if temp_path and not hasattr(uploaded, "temporary_file_path") and os.path.exists(temp_path):
+                            os.remove(temp_path)
                 instance.save()
             formset.save_m2m()
             return
@@ -780,6 +896,23 @@ class StoreAdmin(admin.ModelAdmin):
     list_filter = ("active",)
     search_fields = ("name",)
     ordering = ("order", "name")
+
+    def save_model(self, request, obj, form, change):
+        creating = obj.pk is None
+        super().save_model(request, obj, form, change)
+        if creating:
+            try:
+                ensure_store_drive_folders(store=obj)
+                self.message_user(
+                    request,
+                    f"Created Google Drive folders for store '{obj.name}'.",
+                )
+            except Exception as exc:
+                self.message_user(
+                    request,
+                    f"Store saved, but Drive folder setup failed: {exc}",
+                    level=messages.WARNING,
+                )
 
 
 @admin.register(StoreMembership)

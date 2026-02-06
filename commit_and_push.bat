@@ -18,8 +18,21 @@ if errorlevel 1 goto :git_error
 
 echo Creating commit...
 git commit -m "%COMMIT_MSG%"
-if errorlevel 1 goto :git_error
+if errorlevel 1 goto :commit_maybe_clean
+goto :push_step
 
+:commit_maybe_clean
+git status --porcelain > "%TEMP%\dad_git_status.tmp"
+for %%A in ("%TEMP%\dad_git_status.tmp") do set STATUS_SIZE=%%~zA
+if "%STATUS_SIZE%"=="0" (
+    echo No new file changes to commit. Continuing to push existing local commits...
+) else (
+    del "%TEMP%\dad_git_status.tmp" >nul 2>nul
+    goto :git_error
+)
+del "%TEMP%\dad_git_status.tmp" >nul 2>nul
+
+:push_step
 echo Pushing to origin/main...
 git push origin main
 if errorlevel 1 goto :git_error

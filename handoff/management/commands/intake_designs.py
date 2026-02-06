@@ -9,7 +9,7 @@ from django.conf import settings
 from django.core.management.base import BaseCommand
 from django.utils import timezone
 
-from handoff.drive import FOLDER_MIME, ensure_bucket, ensure_folder, get_drive_service
+from handoff.drive import FOLDER_MIME, ensure_bucket, get_drive_service
 from handoff.models import AppSettings, DesignFile, Store
 
 VALID_MIME = {"image/png", "image/jpeg", "image/jpg"}
@@ -120,7 +120,7 @@ class Command(BaseCommand):
             raise RuntimeError("GOOGLE_DRIVE_ROOT_FOLDER_ID is not set.")
 
         service = get_drive_service()
-        dump_id = ensure_folder(service, "Dump_Zone", root_id)
+        dump_id = ensure_bucket(service, root_id, "Dump_Zone", store=store)
         scheduled_id = ensure_bucket(service, root_id, "Scheduled", store=store)
         error_id = ensure_bucket(service, root_id, "Error", store=store)
 

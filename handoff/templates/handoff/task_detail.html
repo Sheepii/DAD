@@ -123,12 +123,8 @@
           </details>
         </div>
       </div>
-    </div>
-  </div>
 
-  <div class="row g-3 mt-3">
-    <div class="col-12">
-      <div class="card shadow-sm mb-3">
+      <div class="card shadow-sm mt-3">
         <div class="card-body">
           <div class="d-flex justify-content-between align-items-center">
             <h5 class="card-title mb-0">Design File</h5>
@@ -152,9 +148,9 @@
             {% endif %}
           </div>
           {% if task.drive_design_file_id %}
-            <div class="ratio ratio-16x9 mt-3 rounded overflow-hidden" style="background: #000;">
+            <div class="ratio ratio-4x3 mt-3 rounded overflow-hidden border" style="background: #000;">
               <img
-                src="https://drive.google.com/thumbnail?id={{ task.drive_design_file_id }}&sz=w1200&t={{ task.updated_at|date:'U' }}"
+                src="https://drive.google.com/thumbnail?id={{ task.drive_design_file_id }}&sz=w800&t={{ task.updated_at|date:'U' }}"
                 alt="Design preview"
                 class="w-100 h-100"
                 style="object-fit: contain; background: #000; display: block;"
@@ -166,7 +162,11 @@
           {% endif %}
         </div>
       </div>
+    </div>
+  </div>
 
+  <div class="row g-3 mt-3">
+    <div class="col-12">
       <div class="card shadow-sm mb-3">
         <div class="card-body">
           <h5 class="card-title">Details</h5>

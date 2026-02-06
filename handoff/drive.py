@@ -141,6 +141,29 @@ def ensure_bucket(service, root_id: str, bucket: str, store=None) -> str:
     return base_id
 
 
+def ensure_store_drive_folders(store=None) -> dict[str, str]:
+    root_id = _get_setting("drive_root_folder_id", "") or _get_setting(
+        "GOOGLE_DRIVE_ROOT_FOLDER_ID", ""
+    )
+    if not root_id:
+        raise RuntimeError("GOOGLE_DRIVE_ROOT_FOLDER_ID is not set.")
+    service = get_drive_service()
+    folder_ids = {}
+    for bucket in ("Dump_Zone", "Scheduled", "Done", "Error", "Mockups"):
+        folder_ids[bucket] = ensure_bucket(service, root_id, bucket, store=store)
+    return folder_ids
+
+
+def get_dump_zone_folder_id(store=None) -> str:
+    root_id = _get_setting("drive_root_folder_id", "") or _get_setting(
+        "GOOGLE_DRIVE_ROOT_FOLDER_ID", ""
+    )
+    if not root_id:
+        raise RuntimeError("GOOGLE_DRIVE_ROOT_FOLDER_ID is not set.")
+    service = get_drive_service()
+    return ensure_bucket(service, root_id, "Dump_Zone", store=store)
+
+
 def get_file_metadata(file_id: str, fields: str = "id,name,parents,mimeType") -> dict:
     service = get_drive_service()
     return service.files().get(fileId=file_id, fields=fields).execute()
