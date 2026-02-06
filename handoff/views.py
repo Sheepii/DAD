@@ -293,7 +293,7 @@ def _build_mockup_context(task: Task) -> dict:
         mockups_folder_id = ""
     zip_extras = []
     if task.template_id:
-        for attachment in task.template.attachments.filter(include_in_mockup_zip=True).exclude(drive_file_id=""):
+        for attachment in task.template.attachments.exclude(drive_file_id=""):
             filename = attachment.filename or attachment.label or f"extra-{attachment.id}"
             guessed_type, _ = mimetypes.guess_type(filename)
             is_video = bool(guessed_type and guessed_type.startswith("video/"))
@@ -304,6 +304,7 @@ def _build_mockup_context(task: Task) -> dict:
                     "filename": filename,
                     "drive_file_id": attachment.drive_file_id,
                     "is_video": is_video,
+                    "include_in_mockup_zip": attachment.include_in_mockup_zip,
                 }
             )
     return {
@@ -670,11 +671,7 @@ def download_mockups(request, task_id: int):
     slots = list(task.mockup_slots.exclude(drive_file_id="").order_by("order"))
     template_assets = []
     if task.template_id:
-        template_assets = list(
-            task.template.attachments.filter(
-                include_in_mockup_zip=True
-            ).exclude(drive_file_id="")
-        )
+        template_assets = list(task.template.attachments.exclude(drive_file_id=""))
     if not slots and not template_assets:
         return redirect("handoff:task_detail", task_id=task.id)
 
@@ -696,12 +693,16 @@ def download_mockups(request, task_id: int):
 
         for slot in slots:
             name, _, data = download_file_bytes(slot.drive_file_id)
-            safe_name = unique_name(f"{slot.order:02d}_{name}")
+            _, ext = os.path.splitext(name or "")
+            ext = ext or ".png"
+            safe_name = unique_name(f"{slot.order}{ext}")
             zip_file.writestr(safe_name, data)
         for idx, asset in enumerate(template_assets, start=1):
+            if not asset.include_in_mockup_zip:
+                continue
             name, _, data = download_file_bytes(asset.drive_file_id)
             asset_name = asset.filename or name or f"template-extra-{idx}.png"
-            safe_name = unique_name(f"extras/{idx:02d}_{asset_name}")
+            safe_name = unique_name(asset_name)
             zip_file.writestr(safe_name, data)
     zip_buffer.seek(0)
 

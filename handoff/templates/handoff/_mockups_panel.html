@@ -57,6 +57,9 @@
             {% endif %}
             <div class="small fw-semibold">{{ extra.label }}</div>
             <div class="text-muted small">{{ extra.filename }}</div>
+            {% if not extra.include_in_mockup_zip %}
+              <div class="text-warning small">Visible only (not included in ZIP)</div>
+            {% endif %}
           </div>
         </div>
       {% endfor %}

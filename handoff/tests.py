@@ -144,5 +144,5 @@ class MockupDownloadZipTests(TestCase):
 
         with zipfile.ZipFile(io.BytesIO(response.content), "r") as zf:
             names = zf.namelist()
-            self.assertIn("01_mockup1.png", names)
-            self.assertIn("extras/01_care-card.png", names)
+            self.assertIn("1.png", names)
+            self.assertIn("care-card.png", names)
