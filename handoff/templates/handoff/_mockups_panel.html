@@ -13,51 +13,50 @@
     </a>
   </div>
   <div class="row g-2">
-    {% for slot in task.mockup_slots.all %}
+    {% for card in mockup_cards %}
       <div class="col-6 col-md-4 col-lg-3">
-        {% with fallback_image_id=slot_images|get_item:slot.order %}
-          {% if slot.drive_file_id or fallback_image_id or required_orders|get_item:slot.order %}
-            {% include "handoff/_mockup_slot.html" with slot=slot fallback_image_id=fallback_image_id required_orders=required_orders %}
-          {% endif %}
-        {% endwith %}
-      </div>
-    {% endfor %}
-    {% for extra in zip_extras %}
-      <div class="col-6 col-md-4 col-lg-3">
-        <div class="border rounded p-2 h-100">
-          {% if extra.is_video %}
-            <video
-              controls
-              class="w-100 rounded mb-2"
-              style="background: #000; aspect-ratio: 1/1; object-fit: cover;"
-              preload="metadata"
-            >
-              <source src="{% url 'handoff:mockup_file_download' extra.drive_file_id %}" />
-            </video>
-          {% else %}
-            <a
-              href="{% url 'handoff:mockup_file_download' extra.drive_file_id %}"
-              download="{{ extra.filename }}"
-              class="d-block text-decoration-none"
-            >
-              <img
-                src="https://drive.google.com/thumbnail?id={{ extra.drive_file_id }}&sz=w300"
-                alt="{{ extra.label }}"
-                class="img-fluid rounded mb-2"
-                style="background: #000; object-fit: cover; display: block;"
-                loading="lazy"
-              />
-            </a>
-          {% endif %}
-          <div class="small fw-semibold">{{ extra.label }}</div>
-          <div class="text-muted small">{{ extra.filename }}</div>
-          <div class="small">
-            <span class="badge bg-secondary">Static</span>
-            {% if not extra.include_in_mockup_zip %}
-              <span class="badge bg-warning text-dark">Visible only</span>
-            {% endif %}
-          </div>
-        </div>
+        {% if card.kind == "slot" %}
+          {% include "handoff/_mockup_slot.html" with slot=card.slot fallback_image_id=card.fallback_image_id required_orders=required_orders %}
+        {% else %}
+          {% with extra=card.extra %}
+            <div class="border rounded p-2 h-100">
+              {% if extra.is_video %}
+                <video
+                  controls
+                  class="w-100 rounded mb-2"
+                  style="background: #000; aspect-ratio: 1/1; object-fit: cover;"
+                  preload="metadata"
+                >
+                  <source src="{% url 'handoff:mockup_file_download' extra.drive_file_id %}" />
+                </video>
+              {% else %}
+                <a
+                  href="{% url 'handoff:mockup_file_download' extra.drive_file_id %}"
+                  download="{{ extra.filename }}"
+                  class="d-block text-decoration-none"
+                >
+                  <img
+                    src="https://drive.google.com/thumbnail?id={{ extra.drive_file_id }}&sz=w300"
+                    alt="{{ extra.label }}"
+                    class="img-fluid rounded mb-2"
+                    style="background: #000; object-fit: cover; display: block;"
+                    loading="lazy"
+                  />
+                </a>
+              {% endif %}
+              <div class="small fw-semibold">
+                {{ extra.label }}
+                <span class="badge bg-secondary ms-1">Static</span>
+              </div>
+              <div class="text-muted small">{{ extra.filename }}</div>
+              {% if not extra.include_in_mockup_zip %}
+                <div class="small">
+                  <span class="badge bg-warning text-dark">Visible only</span>
+                </div>
+              {% endif %}
+            </div>
+          {% endwith %}
+        {% endif %}
       </div>
     {% endfor %}
   </div>

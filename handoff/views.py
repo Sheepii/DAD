@@ -11,6 +11,7 @@ import io
 import json
 import zipfile
 import mimetypes
+import re
 from urllib.parse import quote
 
 from django.http import HttpResponse
@@ -307,13 +308,66 @@ def _build_mockup_context(task: Task) -> dict:
                     "include_in_mockup_zip": attachment.include_in_mockup_zip,
                 }
             )
+
+    def _extract_numeric_order(*values):
+        for value in values:
+            if value is None:
+                continue
+            text = str(value).strip()
+            if not text:
+                continue
+            match = re.search(r"\d+", text)
+            if match:
+                try:
+                    return int(match.group(0))
+                except ValueError:
+                    continue
+        return None
+
+    required_orders = set(task.required_mockup_orders())
+    mockup_cards = []
+    for slot in task.mockup_slots.all():
+        fallback_image_id = slot_images.get(slot.order)
+        is_required = slot.order in required_orders
+        if slot.drive_file_id or fallback_image_id or is_required:
+            mockup_cards.append(
+                {
+                    "kind": "slot",
+                    "number": slot.order,
+                    "sort_number": slot.order,
+                    "slot": slot,
+                    "fallback_image_id": fallback_image_id,
+                }
+            )
+
+    for extra in zip_extras:
+        number = _extract_numeric_order(extra.get("label"), extra.get("filename"))
+        mockup_cards.append(
+            {
+                "kind": "extra",
+                "number": number,
+                "sort_number": number if number is not None else 999999,
+                "extra": extra,
+            }
+        )
+
+    mockup_cards.sort(
+        key=lambda card: (
+            card.get("sort_number", 999999),
+            0 if card.get("kind") == "slot" else 1,
+            card.get("extra", {}).get("label", "") if card.get("kind") == "extra" else "",
+            card.get("slot").order if card.get("kind") == "slot" else 0,
+        )
+    )
+
     return {
         "slot_images": slot_images,
         "folder_error": folder_error,
-        "required_orders": {order: True for order in task.required_mockup_orders()},
+        "required_orders": {order: True for order in required_orders},
         "has_mockup_templates": has_mockup_templates,
         "mockups_folder_id": mockups_folder_id,
         "zip_extras": zip_extras,
+        "mockup_cards": mockup_cards,
     }
 
 
