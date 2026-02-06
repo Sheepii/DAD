@@ -446,13 +446,34 @@ class TemplateAttachmentInline(admin.TabularInline):
     model = TemplateAttachment
     form = TemplateAttachmentForm
     extra = 0
+    readonly_fields = ("attachment_preview", "attachment_link")
     fields = (
         "label",
+        "attachment_preview",
         "attachment_upload",
         "drive_file_id",
+        "attachment_link",
         "filename",
         "include_in_mockup_zip",
     )
+
+    def attachment_preview(self, obj):
+        if not obj.drive_file_id:
+            return ""
+        url = f"https://drive.google.com/thumbnail?id={obj.drive_file_id}&sz=w240"
+        return mark_safe(
+            f'<img src="{url}" style="width:80px;height:80px;object-fit:cover;border:1px solid #ddd;border-radius:6px;background:#000;" />'
+        )
+
+    attachment_preview.short_description = "Preview"
+
+    def attachment_link(self, obj):
+        if not obj.drive_file_id:
+            return ""
+        url = f"https://drive.google.com/file/d/{obj.drive_file_id}/view"
+        return mark_safe(f'<a href="{url}" target="_blank" rel="noopener">Open file</a>')
+
+    attachment_link.short_description = "Drive link"
 
 
 class MockupTemplateInline(admin.TabularInline):
@@ -572,6 +593,9 @@ class TaskTemplateAdmin(admin.ModelAdmin):
     list_display = ("name",)
     search_fields = ("name",)
     inlines = [TemplateAttachmentInline, MockupTemplateInline]
+
+    class Media:
+        js = ("handoff/admin_template_upload.js",)
 
     def save_formset(self, request, form, formset, change):
         instances = formset.save(commit=False)
