@@ -25,6 +25,7 @@ from .context_processors import _compute_runway_status
 from .design_workflow import ensure_emergency_design
 from .mockup_generator import generate_mockup_bytes_for_template
 from .drive import upload_mockup_bytes_to_bucket
+from .schedule_sync import backfill_scheduled_designs
 from .models import (
     AdminNote,
     Attachment,
@@ -82,6 +83,11 @@ def handoff_schedule_view(request):
         current = datetime.date(year, month, 1)
     else:
         current = datetime.date(today.year, today.month, 1)
+    next_month = (current.replace(day=28) + datetime.timedelta(days=4)).replace(day=1)
+    month_after_next = (next_month.replace(day=28) + datetime.timedelta(days=4)).replace(day=1)
+    sync_from = current - datetime.timedelta(days=7)
+    sync_to = month_after_next + datetime.timedelta(days=7)
+    backfill_scheduled_designs(store=selected_store, date_from=sync_from, date_to=sync_to)
 
     selected_date = None
     if date_str:
@@ -204,7 +210,6 @@ def handoff_schedule_view(request):
         weeks.append(week_cells)
 
     prev_month = (current.replace(day=1) - datetime.timedelta(days=1)).replace(day=1)
-    next_month = (current.replace(day=28) + datetime.timedelta(days=4)).replace(day=1)
 
     selected_design = None
     if selected_date:

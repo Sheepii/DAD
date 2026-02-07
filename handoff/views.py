@@ -40,6 +40,7 @@ from .mockup_service import (
     run_mockup_generation,
     start_mockup_generation_job,
 )
+from .schedule_sync import backfill_scheduled_designs
 from .etsy import format_tags_csv, normalize_tags_csv, suggest_title_from_filename, validate_tags
 from .ai import generate_etsy_tags
 from .models import (
@@ -95,6 +96,14 @@ def today(request):
     store = _get_store_from_request(request)
     if user_stores and not store and len(user_stores) == 1:
         store = user_stores[0]
+    sync_horizon = today_date + datetime.timedelta(days=30)
+    if store:
+        backfill_scheduled_designs(store=store, date_from=today_date, date_to=sync_horizon)
+    elif request.user.is_staff or request.user.is_superuser:
+        backfill_scheduled_designs(date_from=today_date, date_to=sync_horizon)
+    else:
+        for user_store in user_stores:
+            backfill_scheduled_designs(store=user_store, date_from=today_date, date_to=sync_horizon)
 
     if request.user.is_staff or request.user.is_superuser:
         RecurringTask.generate_for_date(today_date, assignee=assignee)
@@ -239,6 +248,11 @@ def store_calendars(request):
     today = timezone.localdate()
     horizon_days = 14
     horizon = today + datetime.timedelta(days=horizon_days)
+    if request.user.is_staff or request.user.is_superuser:
+        backfill_scheduled_designs(date_from=today, date_to=horizon)
+    else:
+        for store in stores:
+            backfill_scheduled_designs(store=store, date_from=today, date_to=horizon)
 
     scheduled_qs = ScheduledDesign.objects.filter(
         due_date__gte=today, due_date__lt=horizon
