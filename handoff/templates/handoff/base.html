@@ -76,18 +76,37 @@
               </select>
             </div>
           {% endif %}
-          <a class="btn btn-outline-primary btn-sm" href="{% url 'handoff:summary' %}{% if current_store %}?store={{ current_store.id }}{% endif %}">
-            Summary
-          </a>
-          <a class="btn btn-outline-primary btn-sm" href="{% url 'handoff:store_calendars' %}{% if current_store %}?store={{ current_store.id }}{% endif %}">
-            Store calendars
-          </a>
-          <a class="btn btn-outline-info btn-sm" href="{% url 'handoff:sop_library' %}">
-            SOPs
-          </a>
-          {% if request.user.is_staff %}
-            <a class="btn btn-outline-secondary btn-sm" href="/admin/">Admin</a>
-          {% endif %}
+          <div class="dropdown">
+            <button
+              class="btn btn-outline-primary btn-sm dropdown-toggle"
+              type="button"
+              data-bs-toggle="dropdown"
+              aria-expanded="false"
+            >
+              Menu
+            </button>
+            <ul class="dropdown-menu dropdown-menu-end">
+              <li>
+                <a class="dropdown-item" href="{% url 'handoff:summary' %}{% if current_store %}?store={{ current_store.id }}{% endif %}">
+                  Summary
+                </a>
+              </li>
+              <li>
+                <a class="dropdown-item" href="{% url 'handoff:store_calendars' %}{% if current_store %}?store={{ current_store.id }}{% endif %}">
+                  Store calendars
+                </a>
+              </li>
+              <li>
+                <a class="dropdown-item" href="{% url 'handoff:sop_library' %}">
+                  SOPs
+                </a>
+              </li>
+              {% if request.user.is_staff %}
+                <li><hr class="dropdown-divider" /></li>
+                <li><a class="dropdown-item" href="/admin/">Admin</a></li>
+              {% endif %}
+            </ul>
+          </div>
           {% if request.user.is_authenticated %}
             <span class="text-muted small">{{ request.user.get_username }}</span>
             <form method="post" action="{% url 'logout' %}" class="mb-0">
@@ -104,7 +123,10 @@
     <main class="container py-4">
       <div id="csrf-token" class="d-none">{% csrf_token %}</div>
       {% if runway and runway.below_threshold %}
-        <div class="alert {% if runway.days_remaining == 0 %}alert-danger{% else %}alert-warning{% endif %}">
+        <div
+          class="alert {% if runway.days_remaining == 0 %}alert-danger{% else %}alert-warning{% endif %} shadow-sm"
+          style="position: fixed; right: 16px; bottom: 16px; z-index: 1035; margin: 0; padding: 8px 10px; font-size: 12px; line-height: 1.25; max-width: 360px;"
+        >
           {% if current_store %}{{ current_store.name }} runway low:{% else %}Runway low:{% endif %}
           {{ runway.days_remaining }} day{% if runway.days_remaining != 1 %}s{% endif %} remaining
           {% if runway.exhaustion_date %}(last date {{ runway.exhaustion_date|date:"M j, Y" }}){% endif %}.

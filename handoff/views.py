@@ -170,6 +170,12 @@ def today(request):
                     filename="Scheduled design",
                 )
             # Skip auto-generation here to avoid blocking page loads.
+        if store:
+            task.display_store_name = store.name
+        elif scheduled_by_task.get(task.id) and scheduled_by_task[task.id].store:
+            task.display_store_name = scheduled_by_task[task.id].store.name
+        else:
+            task.display_store_name = ""
     return render(
         request,
         "handoff/today.html",

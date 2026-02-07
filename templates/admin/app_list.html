@@ -3,12 +3,13 @@
 {% if app_list %}
   <div class="app-list">
     {% for app in app_list %}
-      {% if app.app_label == "handoff" %}
-        <div class="app-handoff">
-          <div class="app-title">{{ app.name }}</div>
+      <details class="{% if app.app_label == "handoff" %}app-handoff{% else %}app-default{% endif %} app-fold">
+        <summary class="app-title">{{ app.name }}</summary>
 
-          <div class="handoff-group">
-            <div class="handoff-group-title">Workflow</div>
+      {% if app.app_label == "handoff" %}
+        <div class="app-fold-content">
+          <details class="handoff-group handoff-fold">
+            <summary class="handoff-group-title">Workflow</summary>
             <ul class="handoff-list">
               {% for model in app.models %}
                 {% if model.object_name|lower in "task,recurringtask,taskstep" %}
@@ -19,10 +20,10 @@
                 {% endif %}
               {% endfor %}
             </ul>
-          </div>
+          </details>
 
-          <div class="handoff-group">
-            <div class="handoff-group-title">Templates</div>
+          <details class="handoff-group handoff-fold">
+            <summary class="handoff-group-title">Templates</summary>
             <ul class="handoff-list">
               {% for model in app.models %}
                 {% if model.object_name|lower in "tasktemplate,mockuptemplate" %}
@@ -33,10 +34,10 @@
                 {% endif %}
               {% endfor %}
             </ul>
-          </div>
+          </details>
 
-          <div class="handoff-group">
-            <div class="handoff-group-title">Files</div>
+          <details class="handoff-group handoff-fold">
+            <summary class="handoff-group-title">Files</summary>
             <ul class="handoff-list">
               {% for model in app.models %}
                 {% if model.object_name|lower in "attachment" %}
@@ -47,20 +48,20 @@
                 {% endif %}
               {% endfor %}
             </ul>
-          </div>
+          </details>
 
-            <div class="handoff-group">
-              <div class="handoff-group-title">System</div>
-              <ul class="handoff-list">
-                <li class="handoff-item">
-                  <a href="/admin/handoff/schedule/">Design Schedule</a>
-                </li>
-                <li class="handoff-item">
-                  <a href="/admin/handoff/notes/">Admin Notes</a>
-                </li>
-                <li class="handoff-item">
-                  <a href="/admin/handoff/deploy/">Deploy Latest</a>
-                </li>
+          <details class="handoff-group handoff-fold">
+            <summary class="handoff-group-title">System</summary>
+            <ul class="handoff-list">
+              <li class="handoff-item">
+                <a href="/admin/handoff/schedule/">Design Schedule</a>
+              </li>
+              <li class="handoff-item">
+                <a href="/admin/handoff/notes/">Admin Notes</a>
+              </li>
+              <li class="handoff-item">
+                <a href="/admin/handoff/deploy/">Deploy Latest</a>
+              </li>
               {% for model in app.models %}
                 {% if model.object_name|lower in "appsettings,store,storemembership" %}
                   <li class="handoff-item">
@@ -70,21 +71,19 @@
                 {% endif %}
               {% endfor %}
             </ul>
-          </div>
+          </details>
         </div>
       {% else %}
-        <div class="app-default">
-          <div class="app-title">{{ app.name }}</div>
-          <ul class="handoff-list">
-            {% for model in app.models %}
-              <li class="handoff-item">
-                <a href="{{ model.admin_url }}">{{ model.name }}</a>
-                {% if model.add_url %}<a class="addlink" href="{{ model.add_url }}">Add</a>{% endif %}
-              </li>
-            {% endfor %}
-          </ul>
-        </div>
+        <ul class="handoff-list">
+          {% for model in app.models %}
+            <li class="handoff-item">
+              <a href="{{ model.admin_url }}">{{ model.name }}</a>
+              {% if model.add_url %}<a class="addlink" href="{{ model.add_url }}">Add</a>{% endif %}
+            </li>
+          {% endfor %}
+        </ul>
       {% endif %}
+      </details>
     {% endfor %}
   </div>
 {% else %}

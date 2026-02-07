@@ -42,38 +42,40 @@
 
     <section class="notes-list">
       {% for note in notes %}
-        <article class="note-card">
-          <header class="note-card-header">
-            <div class="note-card-title">
-              {{ note.title|default:"Untitled note" }}
-            </div>
-            <span class="note-meta">
-              {{ note.created_at|date:"M d, Y H:i" }}
-              {% if note.author %}· {{ note.author.get_username }}{% endif %}
-            </span>
-          </header>
-          <div class="note-body">{{ note.body|linebreaksbr }}</div>
-          {% if note.images.all %}
-            <div class="note-image-grid">
-              {% for image in note.images.all %}
-                <button
-                  type="button"
-                  class="note-image-btn"
-                  data-full="https://drive.google.com/uc?export=view&id={{ image.drive_file_id }}"
-                  data-caption="{{ image.filename|default:'Note image' }}"
-                  title="Click to zoom"
-                >
-                  <span class="note-image-tile">
-                    <img
-                      src="https://drive.google.com/thumbnail?id={{ image.drive_file_id }}&sz=w800"
-                      alt="{{ image.filename|default:'Note image' }}"
-                      loading="lazy"
-                    />
-                  </span>
-                </button>
-              {% endfor %}
-            </div>
-          {% endif %}
+        <article class="note-card note-card-clickable" tabindex="0" role="button" aria-label="Open note">
+          <div class="note-card-content">
+            <header class="note-card-header">
+              <div class="note-card-title">
+                {{ note.title|default:"Untitled note" }}
+              </div>
+              <span class="note-meta">
+                {{ note.created_at|date:"M d, Y H:i" }}
+                {% if note.author %}· {{ note.author.get_username }}{% endif %}
+              </span>
+            </header>
+            <div class="note-body">{{ note.body|linebreaksbr }}</div>
+            {% if note.images.all %}
+              <div class="note-image-grid">
+                {% for image in note.images.all %}
+                  <button
+                    type="button"
+                    class="note-image-btn"
+                    data-full="https://drive.google.com/uc?export=view&id={{ image.drive_file_id }}"
+                    data-caption="{{ image.filename|default:'Note image' }}"
+                    title="Click to zoom"
+                  >
+                    <span class="note-image-tile">
+                      <img
+                        src="https://drive.google.com/thumbnail?id={{ image.drive_file_id }}&sz=w800"
+                        alt="{{ image.filename|default:'Note image' }}"
+                        loading="lazy"
+                      />
+                    </span>
+                  </button>
+                {% endfor %}
+              </div>
+            {% endif %}
+          </div>
         </article>
       {% empty %}
         <div class="note-empty">
@@ -91,6 +93,14 @@
     <div class="note-lightbox-body">
       <img id="note-lightbox-image" alt="Note image zoom" />
     </div>
+  </dialog>
+
+  <dialog id="note-detail-dialog" class="note-detail-dialog">
+    <div class="note-detail-head">
+      <span>Note</span>
+      <button type="button" class="button" id="note-detail-close">Close</button>
+    </div>
+    <div class="note-detail-body" id="note-detail-body"></div>
   </dialog>
 
   <script>
@@ -183,18 +193,44 @@
         }
       });
 
+      const notesList = document.querySelector(".notes-list");
+      const detailDialog = document.getElementById("note-detail-dialog");
+      const detailBody = document.getElementById("note-detail-body");
+      const detailClose = document.getElementById("note-detail-close");
       const lightbox = document.getElementById("note-image-lightbox");
       const lightboxImage = document.getElementById("note-lightbox-image");
       const lightboxCaption = document.getElementById("note-lightbox-caption");
       const closeBtn = document.getElementById("note-lightbox-close");
-      document.querySelectorAll(".note-image-btn").forEach((btn) => {
-        btn.addEventListener("click", () => {
-          if (!lightbox || !lightboxImage) return;
-          lightboxImage.src = btn.dataset.full || "";
-          if (lightboxCaption) lightboxCaption.textContent = btn.dataset.caption || "";
-          lightbox.showModal();
+      const openNoteDialog = (card) => {
+        if (!detailDialog || !detailBody || !card) return;
+        const content = card.querySelector(".note-card-content");
+        if (!content) return;
+        detailBody.innerHTML = content.innerHTML;
+        detailDialog.showModal();
+      };
+
+      if (notesList) {
+        notesList.addEventListener("click", (event) => {
+          const imageButton = event.target.closest(".note-image-btn");
+          if (imageButton) {
+            if (!lightbox || !lightboxImage) return;
+            lightboxImage.src = imageButton.dataset.full || "";
+            if (lightboxCaption) lightboxCaption.textContent = imageButton.dataset.caption || "";
+            lightbox.showModal();
+            return;
+          }
+          const card = event.target.closest(".note-card-clickable");
+          if (!card) return;
+          openNoteDialog(card);
         });
-      });
+        notesList.addEventListener("keydown", (event) => {
+          if (event.key !== "Enter" && event.key !== " ") return;
+          const card = event.target.closest(".note-card-clickable");
+          if (!card) return;
+          event.preventDefault();
+          openNoteDialog(card);
+        });
+      }
       if (closeBtn && lightbox) {
         closeBtn.addEventListener("click", () => lightbox.close());
       }
@@ -208,6 +244,22 @@
             event.clientY <= rect.bottom;
           if (!inside) {
             lightbox.close();
+          }
+        });
+      }
+      if (detailClose && detailDialog) {
+        detailClose.addEventListener("click", () => detailDialog.close());
+      }
+      if (detailDialog) {
+        detailDialog.addEventListener("click", (event) => {
+          const rect = detailDialog.getBoundingClientRect();
+          const inside =
+            event.clientX >= rect.left &&
+            event.clientX <= rect.right &&
+            event.clientY >= rect.top &&
+            event.clientY <= rect.bottom;
+          if (!inside) {
+            detailDialog.close();
           }
         });
       }

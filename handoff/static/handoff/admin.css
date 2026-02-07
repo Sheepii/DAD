@@ -1,3 +1,8 @@
+.admin-interface,
+html body {
+  font-size: calc(1rem + 3px);
+}
+
 .app-handoff {
   padding: 8px 6px 12px;
 }
@@ -6,6 +11,39 @@
   font-weight: 700;
   letter-spacing: 0.3px;
   margin-bottom: 8px;
+}
+
+.app-fold {
+  margin-bottom: 10px;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.app-fold > .app-title {
+  margin: 0;
+  padding: 10px 12px;
+  list-style: none;
+  cursor: pointer;
+  display: block;
+}
+
+.app-fold > .app-title::-webkit-details-marker {
+  display: none;
+}
+
+.app-fold > .app-title::after {
+  content: "+";
+  float: right;
+  opacity: 0.8;
+}
+
+.app-fold[open] > .app-title::after {
+  content: "-";
+}
+
+.app-fold-content {
+  padding: 0 6px 8px;
 }
 
 .handoff-group {
@@ -22,6 +60,35 @@
   letter-spacing: 1px;
   color: #9fb3c8;
   margin-bottom: 6px;
+}
+
+.handoff-fold {
+  padding: 0;
+}
+
+.handoff-fold > .handoff-group-title {
+  margin: 0;
+  padding: 8px 10px;
+  list-style: none;
+  cursor: pointer;
+}
+
+.handoff-fold > .handoff-group-title::-webkit-details-marker {
+  display: none;
+}
+
+.handoff-fold > .handoff-group-title::after {
+  content: "+";
+  float: right;
+  opacity: 0.8;
+}
+
+.handoff-fold[open] > .handoff-group-title::after {
+  content: "-";
+}
+
+.handoff-fold > .handoff-list {
+  padding: 0 10px 8px;
 }
 
 .handoff-list {
@@ -98,6 +165,18 @@
   border-radius: 10px;
   border: 1px solid rgba(255, 255, 255, 0.1);
   background: rgba(0, 0, 0, 0.35);
+}
+
+.note-card-clickable {
+  cursor: pointer;
+  transition: border-color 0.16s ease, background 0.16s ease;
+}
+
+.note-card-clickable:hover,
+.note-card-clickable:focus-visible {
+  border-color: rgba(59, 130, 246, 0.7);
+  background: rgba(8, 47, 73, 0.4);
+  outline: none;
 }
 
 .note-card-header {
@@ -249,6 +328,34 @@
   background: #000;
 }
 
+.note-detail-dialog {
+  width: min(92vw, 900px);
+  max-height: 88vh;
+  border: 0;
+  border-radius: 10px;
+  padding: 0;
+  background: #111827;
+  color: #fff;
+}
+
+.note-detail-dialog::backdrop {
+  background: rgba(0, 0, 0, 0.65);
+}
+
+.note-detail-head {
+  padding: 10px 12px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.18);
+}
+
+.note-detail-body {
+  padding: 14px;
+  overflow: auto;
+  max-height: calc(88vh - 54px);
+}
+
 .admin-notes-toggle {
   position: fixed;
   right: 18px;
@@ -320,4 +427,34 @@
   height: 100%;
   border: 0;
   background: #fff;
+}
+
+.recent-actions-fold {
+  padding: 0;
+}
+
+.recent-actions-fold > summary {
+  list-style: none;
+  cursor: pointer;
+  padding: 10px 12px;
+  font-weight: 600;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.recent-actions-fold > summary::-webkit-details-marker {
+  display: none;
+}
+
+.recent-actions-fold > summary::after {
+  content: "+";
+  float: right;
+  opacity: 0.8;
+}
+
+.recent-actions-fold[open] > summary::after {
+  content: "-";
+}
+
+.recent-actions-body {
+  padding: 10px 12px 12px;
 }
