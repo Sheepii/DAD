@@ -10,7 +10,7 @@ from django.core.management.base import BaseCommand
 from django.utils import timezone
 
 from handoff.drive import FOLDER_MIME, ensure_bucket, get_drive_service
-from handoff.models import AppSettings, DesignFile, Store
+from handoff.models import AppSettings, DesignFile, ScheduledDesign, Store
 
 VALID_MIME = {"image/png", "image/jpeg", "image/jpg"}
 MAX_BYTES = 20 * 1024 * 1024
@@ -196,6 +196,13 @@ class Command(BaseCommand):
                     "source_folder": "Scheduled",
                 },
             )
+            if not dry_run:
+                ScheduledDesign.objects.update_or_create(
+                    due_date=next_date,
+                    recurring_task=None,
+                    store=store,
+                    defaults={"drive_design_file_id": file_id},
+                )
             next_date += dt.timedelta(days=1)
 
         if dry_run:
