@@ -8,6 +8,133 @@
       <p class="notes-callout">Save quick thoughts for the team or yourself.</p>
     </header>
 
+    <style>
+      .notes-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+        gap: 1rem;
+      }
+      .notes-folders-panel {
+        background: #fff;
+        border: 1px solid #e4e4e4;
+        border-radius: 0.5rem;
+        padding: 1rem;
+        margin-bottom: 1.5rem;
+      }
+      .folders-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+        gap: 0.75rem;
+        margin-top: 0.75rem;
+      }
+      .folder-card {
+        border: 1px solid #dcdcdc;
+        border-radius: 0.5rem;
+        padding: 0.75rem;
+        background: #fdfdfd;
+      }
+      .folder-card strong {
+        display: block;
+        margin-bottom: 0.25rem;
+      }
+      .folder-counts {
+        font-size: 0.8rem;
+        color: #555;
+        display: flex;
+        gap: 0.5rem;
+        flex-wrap: wrap;
+      }
+      .note-card-actions {
+        margin-top: 0.75rem;
+        display: flex;
+        justify-content: flex-end;
+      }
+      .note-card-actions form {
+        margin: 0;
+      }
+      .note-card-actions button {
+        font-size: 0.75rem;
+        padding: 0.25rem 0.5rem;
+      }
+      .note-archived-badge {
+        font-size: 0.65rem;
+        padding: 0.2rem 0.4rem;
+        border-radius: 999px;
+        background: #6c757d;
+        color: #fff;
+        margin-left: 0.25rem;
+      }
+      .note-folder-badge {
+        font-size: 0.7rem;
+        padding: 0.15rem 0.45rem;
+        border-radius: 999px;
+        background: #e0e0ff;
+        color: #1c1c8c;
+        margin-left: 0.35rem;
+      }
+      .notes-section-heading {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+      }
+      .notes-section-heading h2 {
+        margin: 0;
+      }
+      .notes-archived-header {
+        margin-top: 2rem;
+        margin-bottom: 0.5rem;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+      }
+      .notes-archived-header h2 {
+        margin: 0;
+      }
+      .notes-archived-hint {
+        font-size: 0.85rem;
+        color: #6c757d;
+      }
+    </style>
+
+    <section class="notes-folders-panel">
+      <div class="notes-section-heading">
+        <h2>Folders</h2>
+        <p class="notes-archived-hint">Create quick buckets to organize notes before archiving.</p>
+      </div>
+      <form method="post" class="folder-form" novalidate>
+        {% csrf_token %}
+        <input type="hidden" name="action" value="create_folder" />
+        <input type="hidden" name="next" value="{{ request.path }}" />
+        <div class="note-form-field">
+          <label for="folder-name-input">New folder name</label>
+          <input
+            id="folder-name-input"
+            name="folder_name"
+            type="text"
+            class="textinput"
+            placeholder="Idea, Reference, Approved"
+            required
+          />
+        </div>
+        <button type="submit" class="default">Create folder</button>
+      </form>
+      {% if folders %}
+        <div class="folders-grid">
+          {% for folder in folders %}
+            <div class="folder-card">
+              <strong>{{ folder.name }}</strong>
+              <div class="folder-counts">
+                <span>{{ folder.active_count }} active</span>
+                <span>{{ folder.archived_count }} archived</span>
+              </div>
+            </div>
+          {% endfor %}
+        </div>
+      {% else %}
+        <p class="note-empty" style="margin:0.5rem 0 0;">No folders yet.</p>
+      {% endif %}
+    </section>
+
     <section class="notes-form-card">
       <form method="post" enctype="multipart/form-data" novalidate id="admin-note-form">
         {% csrf_token %}
@@ -27,6 +154,13 @@
           {% endif %}
         </div>
         <div class="note-form-field">
+          {{ form.folder.label_tag }}
+          {{ form.folder }}
+          {% if form.folder.errors %}
+            <p class="note-error">{{ form.folder.errors.0 }}</p>
+          {% endif %}
+        </div>
+        <div class="note-form-field">
           <label for="note-images-input">Images</label>
           {{ form.images }}
           <div id="note-paste-zone" class="note-paste-zone" tabindex="0">
@@ -41,48 +175,143 @@
     </section>
 
     <section class="notes-list">
-      {% for note in notes %}
-        <article class="note-card note-card-clickable" tabindex="0" role="button" aria-label="Open note">
-          <div class="note-card-content">
-            <header class="note-card-header">
-              <div class="note-card-title">
-                {{ note.title|default:"Untitled note" }}
+      <div class="notes-section-heading">
+        <h2>Active notes</h2>
+        <p class="notes-archived-hint">Archive updates when they are done; they stay visible below.</p>
+      </div>
+      {% if notes %}
+        <div class="notes-grid">
+          {% for note in notes %}
+            <article class="note-card note-card-clickable" tabindex="0" role="button" aria-label="Open note">
+              <div class="note-card-content">
+                <header class="note-card-header">
+                  <div class="note-card-title">
+                    {{ note.title|default:"Untitled note" }}
+                    {% if note.folder %}
+                      <span class="note-folder-badge">{{ note.folder.name }}</span>
+                    {% endif %}
+                  </div>
+                  <span class="note-meta">
+                    {{ note.created_at|date:"M d, Y H:i" }}
+                    {% if note.author %}· {{ note.author.get_username }}{% endif %}
+                  </span>
+                </header>
+                <div class="note-body">{{ note.body|linebreaksbr }}</div>
+                {% if note.images.all %}
+                  <div class="note-image-grid">
+                    {% for image in note.images.all %}
+                      <button
+                        type="button"
+                        class="note-image-btn"
+                        data-full="https://drive.google.com/uc?export=view&id={{ image.drive_file_id }}"
+                        data-caption="{{ image.filename|default:'Note image' }}"
+                        title="Click to zoom"
+                      >
+                        <span class="note-image-tile">
+                          <img
+                            src="https://drive.google.com/thumbnail?id={{ image.drive_file_id }}&sz=w800"
+                            alt="{{ image.filename|default:'Note image' }}"
+                            loading="lazy"
+                          />
+                        </span>
+                      </button>
+                    {% endfor %}
+                  </div>
+                {% endif %}
+                <div class="note-card-actions">
+                  <form method="post" class="note-action-form">
+                    {% csrf_token %}
+                    <input type="hidden" name="action" value="archive" />
+                    <input type="hidden" name="note_id" value="{{ note.id }}" />
+                    <input type="hidden" name="next" value="{{ request.path }}" />
+                    <button
+                      type="submit"
+                      class="default"
+                      onclick="event.stopPropagation();"
+                      title="Archive this note"
+                    >
+                      Archive
+                    </button>
+                  </form>
+                </div>
               </div>
-              <span class="note-meta">
-                {{ note.created_at|date:"M d, Y H:i" }}
-                {% if note.author %}· {{ note.author.get_username }}{% endif %}
-              </span>
-            </header>
-            <div class="note-body">{{ note.body|linebreaksbr }}</div>
-            {% if note.images.all %}
-              <div class="note-image-grid">
-                {% for image in note.images.all %}
-                  <button
-                    type="button"
-                    class="note-image-btn"
-                    data-full="https://drive.google.com/uc?export=view&id={{ image.drive_file_id }}"
-                    data-caption="{{ image.filename|default:'Note image' }}"
-                    title="Click to zoom"
-                  >
-                    <span class="note-image-tile">
-                      <img
-                        src="https://drive.google.com/thumbnail?id={{ image.drive_file_id }}&sz=w800"
-                        alt="{{ image.filename|default:'Note image' }}"
-                        loading="lazy"
-                      />
-                    </span>
-                  </button>
-                {% endfor %}
-              </div>
-            {% endif %}
-          </div>
-        </article>
-      {% empty %}
+            </article>
+          {% endfor %}
+        </div>
+      {% else %}
         <div class="note-empty">
           <p>{% translate "No notes yet." %}</p>
         </div>
-      {% endfor %}
+      {% endif %}
     </section>
+
+    {% if archived_notes %}
+      <section class="notes-archived">
+        <div class="notes-archived-header">
+          <h2>Archived notes</h2>
+          <span class="notes-archived-hint">Restoring a note brings it back to the active list.</span>
+        </div>
+        <div class="notes-grid">
+          {% for note in archived_notes %}
+          <article class="note-card note-card-clickable" tabindex="0" role="button" aria-label="Open note">
+            <div class="note-card-content">
+              <header class="note-card-header">
+                <div class="note-card-title">
+                  {{ note.title|default:"Untitled note" }}
+                  {% if note.folder %}
+                    <span class="note-folder-badge">{{ note.folder.name }}</span>
+                  {% endif %}
+                  <span class="note-archived-badge">{% translate "Archived" %}</span>
+                </div>
+                  <span class="note-meta">
+                    {{ note.created_at|date:"M d, Y H:i" }}
+                    {% if note.author %}· {{ note.author.get_username }}{% endif %}
+                  </span>
+                </header>
+                <div class="note-body">{{ note.body|linebreaksbr }}</div>
+                {% if note.images.all %}
+                  <div class="note-image-grid">
+                    {% for image in note.images.all %}
+                      <button
+                        type="button"
+                        class="note-image-btn"
+                        data-full="https://drive.google.com/uc?export=view&id={{ image.drive_file_id }}"
+                        data-caption="{{ image.filename|default:'Note image' }}"
+                        title="Click to zoom"
+                      >
+                        <span class="note-image-tile">
+                          <img
+                            src="https://drive.google.com/thumbnail?id={{ image.drive_file_id }}&sz=w800"
+                            alt="{{ image.filename|default:'Note image' }}"
+                            loading="lazy"
+                          />
+                        </span>
+                      </button>
+                    {% endfor %}
+                  </div>
+                {% endif %}
+                <div class="note-card-actions">
+                  <form method="post" class="note-action-form">
+                    {% csrf_token %}
+                    <input type="hidden" name="action" value="unarchive" />
+                    <input type="hidden" name="note_id" value="{{ note.id }}" />
+                    <input type="hidden" name="next" value="{{ request.path }}" />
+                    <button
+                      type="submit"
+                      class="default"
+                      onclick="event.stopPropagation();"
+                      title="Restore this note"
+                    >
+                      Restore
+                    </button>
+                  </form>
+                </div>
+              </div>
+            </article>
+          {% endfor %}
+        </div>
+      </section>
+    {% endif %}
   </div>
 
   <dialog id="note-image-lightbox" class="note-lightbox">

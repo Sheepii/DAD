@@ -16,8 +16,9 @@ import mimetypes
 import re
 from urllib.parse import quote
 
-from django.http import HttpResponse
+from django.http import HttpResponse, HttpResponseForbidden
 from django.http import JsonResponse
+from django.urls import reverse
 from django.views.decorators.csrf import csrf_exempt
 from django.contrib.admin.views.decorators import staff_member_required
 
@@ -83,6 +84,14 @@ def _get_store_from_request(request):
         return stores.get(pk=int(store_id))
     except (Store.DoesNotExist, ValueError):
         return None
+
+
+def _user_can_access_store(request, store: Store | None) -> bool:
+    if request.user.is_staff or request.user.is_superuser:
+        return True
+    if store is None:
+        return False
+    return _get_user_stores(request).filter(pk=store.pk).exists()
 
 
 def _store_query_suffix(store: Store | None) -> str:
@@ -294,6 +303,7 @@ def store_calendars(request):
                 "design_id": sd.drive_design_file_id,
                 "label": sd.recurring_task.title if sd.recurring_task else "Design",
                 "thumb": f"https://drive.google.com/thumbnail?id={sd.drive_design_file_id}&sz=w120",
+                "preview_url": reverse("handoff:scheduled_design_preview", args=[sd.id]),
             }
         )
 
@@ -345,6 +355,23 @@ def store_calendars(request):
             "next_month": f"{next_month.year}-{next_month.month:02d}",
         },
     )
+
+
+@login_required
+def scheduled_design_preview(request, design_id: int):
+    scheduled = get_object_or_404(ScheduledDesign, pk=design_id)
+    if not _user_can_access_store(request, scheduled.store):
+        return HttpResponseForbidden()
+    if not scheduled.drive_design_file_id:
+        return HttpResponse(status=404)
+    try:
+        _, mime_type, data = download_file_bytes(scheduled.drive_design_file_id)
+    except Exception:
+        return HttpResponse(status=502)
+    response = HttpResponse(data, content_type=mime_type or "application/octet-stream")
+    response["Content-Disposition"] = "inline"
+    response["Content-Length"] = str(len(data))
+    return response
 
 
 @login_required

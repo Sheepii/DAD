@@ -1,7 +1,54 @@
 {% extends "admin/base_site.html" %}
 {% load i18n static log %}
 
-{% block extrastyle %}{{ block.super }}<link rel="stylesheet" href="{% static "admin/css/dashboard.css" %}">{% endblock %}
+{% block extrastyle %}
+  {{ block.super }}
+  <link rel="stylesheet" href="{% static "admin/css/dashboard.css" %}">
+  <style>
+    .admin-notes-module {
+      margin-bottom: 1rem;
+      padding: 0.75rem;
+    }
+    .admin-notes-module h2 {
+      font-size: 1rem;
+      margin-top: 0;
+      margin-bottom: 0.5rem;
+    }
+    .admin-notes-module form {
+      display: flex;
+      flex-direction: column;
+      gap: 0.25rem;
+      padding-bottom: 0.5rem;
+      border-bottom: 1px solid #ddd;
+      margin-bottom: 0.5rem;
+    }
+    .admin-notes-module textarea {
+      resize: vertical;
+      min-height: 4.5rem;
+    }
+    .admin-notes-module .recent-notes-list {
+      margin: 0;
+      padding: 0;
+      list-style: none;
+    }
+    .admin-notes-module .recent-notes-list li {
+      margin-bottom: 0.5rem;
+    }
+    .admin-notes-module .recent-notes-list li .note-summary {
+      margin: 0;
+      line-height: 1.3;
+    }
+    .admin-notes-module .recent-notes-list li .note-meta {
+      font-size: 0.75rem;
+      color: #555;
+    }
+    .admin-notes-module .note-link {
+      font-size: 0.75rem;
+      display: block;
+      margin-top: 0.5rem;
+    }
+  </style>
+{% endblock %}
 
 {% block coltype %}colMS{% endblock %}
 
@@ -19,6 +66,46 @@
 
 {% block sidebar %}
 <div id="content-related">
+  {% if admin_notes_quick_form %}
+    <section class="module admin-notes-module">
+      <h2>Notes</h2>
+      <form method="post" action="{% url 'admin:handoff_notes' %}">
+        {% csrf_token %}
+        {{ admin_notes_quick_form.non_field_errors }}
+        <input type="hidden" name="next" value="{{ request.path }}">
+        <div class="mb-2">
+          {{ admin_notes_quick_form.title.label_tag }}
+          {{ admin_notes_quick_form.title }}
+        </div>
+        <div class="mb-2">
+          {{ admin_notes_quick_form.body.label_tag }}
+          {{ admin_notes_quick_form.body }}
+        </div>
+        <div class="mb-2">
+          {{ admin_notes_quick_form.folder.label_tag }}
+          {{ admin_notes_quick_form.folder }}
+        </div>
+        <button type="submit" class="default">Save note</button>
+        <p class="mini">Add images on the full notes page.</p>
+      </form>
+      <ul class="recent-notes-list">
+        {% for note in admin_notes_recent %}
+          <li>
+            <strong>{{ note.title|default:"Untitled note" }}</strong>
+            <div class="note-meta">
+              {{ note.created_at|date:"M d, Y" }}{% if note.author %} · {{ note.author.get_username }}{% endif %}
+            </div>
+            <p class="note-summary">
+              {{ note.body|striptags|truncatechars:90 }}
+            </p>
+          </li>
+        {% empty %}
+          <li class="note-meta">{% translate "No notes yet." %}</li>
+        {% endfor %}
+      </ul>
+      <a class="note-link" href="{% url 'admin:handoff_notes' %}">{% translate "View all notes" %}</a>
+    </section>
+  {% endif %}
   <details class="module recent-actions-fold" id="recent-actions-module">
     <summary>
       <span>{% translate 'Recent actions' %}</span>

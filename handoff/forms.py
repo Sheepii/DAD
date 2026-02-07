@@ -8,6 +8,7 @@ from django.utils import timezone
 from .models import (
     MockupTemplate,
     AdminNote,
+    AdminNoteFolder,
     RecurringTask,
     Task,
     TaskTemplate,
@@ -257,11 +258,21 @@ class AdminNoteForm(forms.ModelForm):
             }
         ),
     )
+    folder = forms.ModelChoiceField(
+        queryset=AdminNoteFolder.objects.none(),
+        required=False,
+        empty_label="No folder",
+        widget=forms.Select(attrs={"class": "form-select form-select-sm"}),
+    )
 
     class Meta:
         model = AdminNote
-        fields = ["title", "body"]
+        fields = ["title", "body", "folder"]
         widgets = {
             "title": forms.TextInput(attrs={"class": "vTextField wide"}),
             "body": forms.Textarea(attrs={"class": "vLargeTextField wide", "rows": 6}),
         }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields["folder"].queryset = AdminNoteFolder.objects.order_by("name")

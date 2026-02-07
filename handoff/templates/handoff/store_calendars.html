@@ -150,6 +150,7 @@
                         data-design-date="{{ day.date|date:'M j, Y' }}"
                         data-design-thumb="{{ item.thumb|escape }}"
                         data-design-full="https://drive.google.com/uc?export=view&id={{ item.design_id }}"
+                        data-design-preview-url="{{ item.preview_url }}"
                         data-design-open="https://drive.google.com/file/d/{{ item.design_id }}/view"
                       >
                         <div class="design-thumb-wrap">
@@ -220,7 +221,20 @@
         btn.addEventListener("click", () => {
           if (titleEl) titleEl.textContent = btn.dataset.designLabel || "Design preview";
           if (dateEl) dateEl.textContent = btn.dataset.designDate || "";
-          if (imageEl) imageEl.src = btn.dataset.designFull || btn.dataset.designThumb || "";
+          const previewUrl =
+            btn.dataset.designPreviewUrl ||
+            btn.dataset.designFull ||
+            btn.dataset.designThumb ||
+            "";
+          const thumbUrl = btn.dataset.designThumb;
+          if (imageEl) {
+            imageEl.onerror = () => {
+              if (thumbUrl && imageEl.src !== thumbUrl) {
+                imageEl.src = thumbUrl;
+              }
+            };
+            imageEl.src = previewUrl;
+          }
           if (openEl) openEl.href = btn.dataset.designOpen || "#";
           modal.show();
         });

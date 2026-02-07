@@ -12,6 +12,8 @@ import datetime
 from django.http import JsonResponse
 from django.core.management import call_command
 import subprocess
+from types import MethodType
+from django.db.models import Count, Q
 
 from .forms import (
     AdminNoteForm,
@@ -28,6 +30,7 @@ from .drive import upload_mockup_bytes_to_bucket
 from .schedule_sync import backfill_scheduled_designs
 from .models import (
     AdminNote,
+    AdminNoteFolder,
     AdminNoteImage,
     Attachment,
     AppSettings,
@@ -59,6 +62,24 @@ from .drive import (
 import tempfile
 import os
 from .mockup_service import maybe_autogenerate_mockups
+
+
+_original_admin_index = admin.site.index
+
+
+def _admin_index_with_notes(self, request, extra_context=None):
+    extra = dict(extra_context or {})
+    extra.setdefault("admin_notes_quick_form", AdminNoteForm())
+    extra.setdefault(
+        "admin_notes_recent",
+        AdminNote.objects.filter(archived=False)
+        .order_by("-created_at")
+        .select_related("author")[:6],
+    )
+    return _original_admin_index(request, extra_context=extra)
+
+
+admin.site.index = MethodType(_admin_index_with_notes, admin.site)
 
 
 def handoff_schedule_view(request):
@@ -468,8 +489,46 @@ def mockup_studio_view(request):
 
 def admin_notes_view(request):
     form = AdminNoteForm(request.POST or None, request.FILES or None)
-    notes = AdminNote.objects.select_related("author").prefetch_related("images")[:200]
+    next_url = request.POST.get("next") or reverse("admin:handoff_notes")
+    folders = (
+        AdminNoteFolder.objects.annotate(
+            active_count=Count("notes", filter=Q(notes__archived=False)),
+            archived_count=Count("notes", filter=Q(notes__archived=True)),
+        )
+        .order_by("name")
+    )
+    notes = (
+        AdminNote.objects.filter(archived=False)
+        .select_related("author", "folder")
+        .prefetch_related("images")[:200]
+    )
+    archived_notes = (
+        AdminNote.objects.filter(archived=True)
+        .select_related("author", "folder")
+        .prefetch_related("images")[:100]
+    )
     if request.method == "POST":
+        action = request.POST.get("action")
+        if action == "create_folder":
+            folder_name = (request.POST.get("folder_name") or "").strip()
+            if folder_name:
+                folder, created = AdminNoteFolder.objects.get_or_create(name=folder_name)
+                if created:
+                    messages.success(request, f"Folder '{folder.name}' created.")
+                else:
+                    messages.warning(request, f"Folder '{folder.name}' already exists.")
+            else:
+                messages.warning(request, "Enter a folder name.")
+            return redirect(next_url)
+        if action in {"archive", "unarchive"}:
+            note_id = request.POST.get("note_id")
+            note = AdminNote.objects.filter(pk=note_id).first()
+            if note:
+                note.archived = action == "archive"
+                note.save(update_fields=["archived"])
+                message = "Note archived." if note.archived else "Note restored."
+                messages.success(request, message)
+            return redirect(next_url)
         if form.is_valid():
             note = form.save(commit=False)
             if request.user.is_authenticated:
@@ -509,11 +568,13 @@ def admin_notes_view(request):
                 messages.warning(request, "Note saved, but image upload failed.")
             else:
                 messages.success(request, "Note saved.")
-            return redirect(reverse("admin:handoff_notes"))
+            return redirect(next_url)
     context = dict(
         admin.site.each_context(request),
         form=form,
         notes=notes,
+        archived_notes=archived_notes,
+        folders=folders,
     )
     return render(request, "admin/handoff_notes.html", context)
 
@@ -926,6 +987,22 @@ class AdminNoteAdmin(admin.ModelAdmin):
     def title_display(self, obj):
         return obj.title or "(untitled)"
     title_display.short_description = "Title"
+
+
+@admin.register(AdminNoteFolder)
+class AdminNoteFolderAdmin(admin.ModelAdmin):
+    list_display = ("name", "active_count", "archived_count", "created_at")
+    search_fields = ("name",)
+    readonly_fields = ("created_at",)
+
+    def active_count(self, obj):
+        return obj.notes.filter(archived=False).count()
+
+    def archived_count(self, obj):
+        return obj.notes.filter(archived=True).count()
+
+    active_count.short_description = "Active notes"
+    archived_count.short_description = "Archived notes"
 
 
 @admin.register(ScheduledDesign)

@@ -6,10 +6,17 @@
   </div>
   <div class="mb-3">
     <a
-      class="btn btn-primary btn-sm me-2"
+      class="btn btn-primary btn-sm me-2 mockup-zip-download-btn"
       href="{% url 'handoff:download_mockups' task.id %}"
+      data-zip-label="Download ZIP"
+      data-zip-loading-label="Preparing download…"
     >
-      Download ZIP
+      <span
+        class="spinner-border spinner-border-sm me-1 visually-hidden mockup-zip-download-spinner"
+        role="status"
+        aria-hidden="true"
+      ></span>
+      <span class="mockup-zip-download-text">Download ZIP</span>
     </a>
   </div>
   <div class="row g-2">
@@ -61,3 +68,30 @@
     {% endfor %}
   </div>
 </div>
+<script>
+  (function () {
+    const panel = document.getElementById("mockups-panel");
+    if (!panel) return;
+    panel.querySelectorAll(".mockup-zip-download-btn").forEach((btn) => {
+      const spinner = btn.querySelector(".mockup-zip-download-spinner");
+      const textEl = btn.querySelector(".mockup-zip-download-text");
+      const loadingLabel =
+        btn.dataset.zipLoadingLabel || btn.dataset.zipLabel || "Preparing download…";
+      btn.addEventListener("click", (event) => {
+        if (btn.dataset.zipLoading === "1") {
+          event.preventDefault();
+          return;
+        }
+        btn.dataset.zipLoading = "1";
+        btn.classList.add("disabled");
+        btn.setAttribute("aria-busy", "true");
+        if (spinner) {
+          spinner.classList.remove("visually-hidden");
+        }
+        if (textEl) {
+          textEl.textContent = loadingLabel;
+        }
+      });
+    });
+  })();
+</script>
