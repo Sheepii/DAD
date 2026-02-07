@@ -384,6 +384,25 @@ def upload_template_asset_bytes(
     )
 
 
+def upload_admin_note_image_bytes(
+    data: bytes,
+    filename: str,
+    note_date=None,
+    mime_type: str = "image/png",
+) -> str:
+    root_id = _get_setting("drive_root_folder_id", "") or _get_setting(
+        "GOOGLE_DRIVE_ROOT_FOLDER_ID", ""
+    )
+    if not root_id:
+        raise RuntimeError("GOOGLE_DRIVE_ROOT_FOLDER_ID is not set.")
+    service = get_drive_service()
+    folder_id = ensure_date_folder(service, root_id, "Admin Notes", note_date)
+    safe_name = os.path.basename(filename or "").strip() or "note-image.png"
+    return upload_file_bytes(
+        data, safe_name, folder_id, mime_type=mime_type, service=service
+    )
+
+
 def archive_design_file(file_id: str, store=None) -> dict:
     root_id = _get_setting("drive_root_folder_id", "") or _get_setting(
         "GOOGLE_DRIVE_ROOT_FOLDER_ID", ""

@@ -9,7 +9,7 @@
     </header>
 
     <section class="notes-form-card">
-      <form method="post" novalidate>
+      <form method="post" enctype="multipart/form-data" novalidate id="admin-note-form">
         {% csrf_token %}
         {{ form.non_field_errors }}
         <div class="note-form-field">
@@ -25,6 +25,16 @@
           {% if form.body.errors %}
             <p class="note-error">{{ form.body.errors.0 }}</p>
           {% endif %}
+        </div>
+        <div class="note-form-field">
+          <label for="note-images-input">Images</label>
+          {{ form.images }}
+          <div id="note-paste-zone" class="note-paste-zone" tabindex="0">
+            <div><strong>Paste images with Ctrl+V</strong> or drag and drop them here.</div>
+            <div class="text-muted small">You can also pick files from your computer.</div>
+            <button type="button" class="button" id="note-images-browse">Choose files</button>
+          </div>
+          <div id="note-image-preview-list" class="note-image-preview-list"></div>
         </div>
         <button type="submit" class="default">Save note</button>
       </form>
@@ -43,6 +53,27 @@
             </span>
           </header>
           <div class="note-body">{{ note.body|linebreaksbr }}</div>
+          {% if note.images.all %}
+            <div class="note-image-grid">
+              {% for image in note.images.all %}
+                <button
+                  type="button"
+                  class="note-image-btn"
+                  data-full="https://drive.google.com/uc?export=view&id={{ image.drive_file_id }}"
+                  data-caption="{{ image.filename|default:'Note image' }}"
+                  title="Click to zoom"
+                >
+                  <span class="note-image-tile">
+                    <img
+                      src="https://drive.google.com/thumbnail?id={{ image.drive_file_id }}&sz=w800"
+                      alt="{{ image.filename|default:'Note image' }}"
+                      loading="lazy"
+                    />
+                  </span>
+                </button>
+              {% endfor %}
+            </div>
+          {% endif %}
         </article>
       {% empty %}
         <div class="note-empty">
@@ -51,4 +82,135 @@
       {% endfor %}
     </section>
   </div>
+
+  <dialog id="note-image-lightbox" class="note-lightbox">
+    <div class="note-lightbox-head">
+      <span id="note-lightbox-caption"></span>
+      <button type="button" class="button" id="note-lightbox-close">Close</button>
+    </div>
+    <div class="note-lightbox-body">
+      <img id="note-lightbox-image" alt="Note image zoom" />
+    </div>
+  </dialog>
+
+  <script>
+    (function () {
+      const fileInput = document.getElementById("note-images-input");
+      const zone = document.getElementById("note-paste-zone");
+      const browse = document.getElementById("note-images-browse");
+      const previewList = document.getElementById("note-image-preview-list");
+      if (fileInput) {
+        fileInput.hidden = true;
+      }
+
+      const renderPreviews = () => {
+        if (!previewList || !fileInput) return;
+        previewList.innerHTML = "";
+        Array.from(fileInput.files || []).forEach((file) => {
+          const item = document.createElement("div");
+          item.className = "note-image-preview-item";
+          const tile = document.createElement("div");
+          tile.className = "note-image-preview-tile";
+          const img = document.createElement("img");
+          img.alt = file.name || "Pasted image";
+          img.src = URL.createObjectURL(file);
+          img.onload = () => URL.revokeObjectURL(img.src);
+          tile.appendChild(img);
+          const label = document.createElement("div");
+          label.className = "note-image-preview-label";
+          label.textContent = file.name || "pasted-image";
+          item.appendChild(tile);
+          item.appendChild(label);
+          previewList.appendChild(item);
+        });
+      };
+
+      const appendFiles = (incoming) => {
+        if (!fileInput || !incoming || !incoming.length) return;
+        const dt = new DataTransfer();
+        Array.from(fileInput.files || []).forEach((f) => dt.items.add(f));
+        Array.from(incoming).forEach((file) => {
+          if ((file.type || "").startsWith("image/")) {
+            dt.items.add(file);
+          }
+        });
+        fileInput.files = dt.files;
+        renderPreviews();
+      };
+
+      if (fileInput) {
+        fileInput.addEventListener("change", renderPreviews);
+      }
+      if (browse && fileInput) {
+        browse.addEventListener("click", () => fileInput.click());
+      }
+      if (zone) {
+        zone.addEventListener("paste", (event) => {
+          const items = Array.from(event.clipboardData?.items || []);
+          const images = items
+            .filter((item) => item.kind === "file" && item.type.startsWith("image/"))
+            .map((item) => item.getAsFile())
+            .filter(Boolean);
+          if (images.length) {
+            event.preventDefault();
+            appendFiles(images);
+          }
+        });
+        zone.addEventListener("dragover", (event) => {
+          event.preventDefault();
+          zone.classList.add("is-dragover");
+        });
+        zone.addEventListener("dragleave", () => zone.classList.remove("is-dragover"));
+        zone.addEventListener("drop", (event) => {
+          event.preventDefault();
+          zone.classList.remove("is-dragover");
+          appendFiles(Array.from(event.dataTransfer?.files || []));
+        });
+      }
+      document.addEventListener("paste", (event) => {
+        if (!fileInput) return;
+        const target = event.target;
+        if (target && target.closest && target.closest("#admin-note-form")) {
+          return;
+        }
+        const items = Array.from(event.clipboardData?.items || []);
+        const images = items
+          .filter((item) => item.kind === "file" && item.type.startsWith("image/"))
+          .map((item) => item.getAsFile())
+          .filter(Boolean);
+        if (images.length) {
+          appendFiles(images);
+        }
+      });
+
+      const lightbox = document.getElementById("note-image-lightbox");
+      const lightboxImage = document.getElementById("note-lightbox-image");
+      const lightboxCaption = document.getElementById("note-lightbox-caption");
+      const closeBtn = document.getElementById("note-lightbox-close");
+      document.querySelectorAll(".note-image-btn").forEach((btn) => {
+        btn.addEventListener("click", () => {
+          if (!lightbox || !lightboxImage) return;
+          lightboxImage.src = btn.dataset.full || "";
+          if (lightboxCaption) lightboxCaption.textContent = btn.dataset.caption || "";
+          lightbox.showModal();
+        });
+      });
+      if (closeBtn && lightbox) {
+        closeBtn.addEventListener("click", () => lightbox.close());
+      }
+      if (lightbox) {
+        lightbox.addEventListener("click", (event) => {
+          const rect = lightbox.getBoundingClientRect();
+          const inside =
+            event.clientX >= rect.left &&
+            event.clientX <= rect.right &&
+            event.clientY >= rect.top &&
+            event.clientY <= rect.bottom;
+          if (!inside) {
+            lightbox.close();
+          }
+        });
+      }
+    })();
+  </script>
 {% endblock %}

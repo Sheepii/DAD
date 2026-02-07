@@ -22,6 +22,10 @@ def _steps_to_text(steps) -> str:
     return ""
 
 
+class MultiImageInput(forms.ClearableFileInput):
+    allow_multiple_selected = True
+
+
 class StepListField(forms.CharField):
     def to_python(self, value):
         value = super().to_python(value)
@@ -243,6 +247,17 @@ class TemplateAttachmentForm(forms.ModelForm):
 
 
 class AdminNoteForm(forms.ModelForm):
+    images = forms.FileField(
+        required=False,
+        widget=MultiImageInput(
+            attrs={
+                "multiple": True,
+                "accept": "image/*",
+                "id": "note-images-input",
+            }
+        ),
+    )
+
     class Meta:
         model = AdminNote
         fields = ["title", "body"]

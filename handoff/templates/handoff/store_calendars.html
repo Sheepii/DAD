@@ -3,22 +3,119 @@
 {% block title %}Store Calendars Preview{% endblock %}
 
 {% block content %}
+  <style>
+    .store-calendar-toolbar {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+      align-items: center;
+      margin-bottom: 16px;
+    }
+    .store-calendar-card {
+      border: 1px solid #d6d6d6;
+      border-radius: 10px;
+      background: #fff;
+      overflow: hidden;
+    }
+    .store-calendar-head {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 12px 14px;
+      border-bottom: 1px solid #e5e5e5;
+      background: #fafafa;
+    }
+    .store-calendar-weekdays {
+      display: grid;
+      grid-template-columns: repeat(7, minmax(100px, 1fr));
+      gap: 6px;
+      padding: 10px 10px 0;
+      font-size: 12px;
+      font-weight: 600;
+      color: #6f6f6f;
+      text-align: center;
+    }
+    .store-calendar-grid {
+      display: grid;
+      grid-template-columns: repeat(7, minmax(100px, 1fr));
+      gap: 6px;
+      padding: 10px;
+    }
+    .store-calendar-cell {
+      border: 1px solid #ececec;
+      border-radius: 8px;
+      background: #fcfcfc;
+      min-height: 110px;
+      padding: 6px;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+    .store-calendar-cell.outside {
+      opacity: 0.35;
+    }
+    .store-calendar-date {
+      font-size: 12px;
+      font-weight: 700;
+      color: #4d4d4d;
+    }
+    .store-calendar-item {
+      display: grid;
+      grid-template-columns: 38px 1fr;
+      gap: 6px;
+      align-items: center;
+      border-radius: 6px;
+      background: #f2f2f2;
+      padding: 4px;
+    }
+    .design-thumb-wrap {
+      width: 38px;
+      height: 38px;
+      border-radius: 4px;
+      background: #000;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
+    }
+    .design-thumb-wrap img {
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+      background: #000;
+    }
+    .store-calendar-item-title {
+      font-size: 11px;
+      line-height: 1.15;
+      font-weight: 600;
+      color: #1f1f1f;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+  </style>
   <div class="d-flex flex-wrap justify-content-between align-items-center gap-3 mb-4">
     <div>
       <h1 class="h3 mb-1">Store calendars preview</h1>
-      <p class="text-muted mb-0">See the next {{ horizon_days }} days for the shops assigned to you.</p>
+      <p class="text-muted mb-0">Monthly schedule view for shops assigned to you.</p>
     </div>
     <a class="btn btn-outline-secondary btn-sm" href="{% url 'handoff:today' %}{% if current_store %}?store={{ current_store.id }}{% endif %}">
       Back to Today
     </a>
   </div>
 
+  <div class="store-calendar-toolbar">
+    <a class="btn btn-outline-secondary btn-sm" href="?month={{ prev_month }}">Prev</a>
+    <strong>{{ month_label }}</strong>
+    <a class="btn btn-outline-secondary btn-sm" href="?month={{ next_month }}">Next</a>
+  </div>
+
   {% if previews %}
     <div class="row g-3">
       {% for block in previews %}
-        <div class="col-12 col-md-6">
-          <div class="card h-100 shadow-sm">
-            <div class="card-header d-flex align-items-center justify-content-between">
+        <div class="col-12">
+          <div class="store-calendar-card">
+            <div class="store-calendar-head">
               <div>
                 <strong>{{ block.title }}</strong>
                 {% if block.store %}
@@ -28,23 +125,32 @@
               {% if block.store and current_store and block.store.id == current_store.id %}
                 <span class="badge bg-primary">Current shop</span>
               {% endif %}
+            </div>            
+            <div class="store-calendar-weekdays">
+              <div>Mon</div><div>Tue</div><div>Wed</div><div>Thu</div><div>Fri</div><div>Sat</div><div>Sun</div>
             </div>
-            {% if block.items %}
-              <ul class="list-group list-group-flush">
-                {% for item in block.items %}
-                  <li class="list-group-item d-flex gap-3 align-items-center">
-                    <img src="{{ item.thumb }}" alt="Design {{ forloop.counter }}" width="64" height="64" class="rounded" />
-                    <div class="flex-grow-1">
-                      <div class="fw-semibold">{{ item.label }}</div>
-                      <div class="text-muted small">{{ item.due_date|date:"D, M j" }}</div>
-                      <div class="text-muted small text-truncate" style="max-width: 180px;">{{ item.design_id }}</div>
-                    </div>
-                  </li>
+            <div class="store-calendar-grid">
+              {% for week in block.weeks %}
+                {% for day in week %}
+                  <div class="store-calendar-cell {% if not day.in_month %}outside{% endif %}">
+                    <div class="store-calendar-date">{{ day.date|date:"j" }}</div>
+                    {% for item in day.scheduled_items %}
+                      <div class="store-calendar-item">
+                        <div class="design-thumb-wrap">
+                          <img src="{{ item.thumb }}" alt="Scheduled design">
+                        </div>
+                        <div>
+                          <div class="store-calendar-item-title">{{ item.label }}</div>
+                          <div class="text-muted" style="font-size:10px;">{{ day.date|date:"M j" }}</div>
+                        </div>
+                      </div>
+                    {% empty %}
+                      <div class="text-muted" style="font-size:10px;">No design</div>
+                    {% endfor %}
+                  </div>
                 {% endfor %}
-              </ul>
-            {% else %}
-              <div class="card-body text-muted">No designs scheduled for the next {{ horizon_days }} days.</div>
-            {% endif %}
+              {% endfor %}
+            </div>
           </div>
         </div>
       {% endfor %}

@@ -5,3 +5,60 @@
   {{ block.super }}
   <link rel="stylesheet" href="{% static 'handoff/admin.css' %}">
 {% endblock %}
+
+{% block footer %}
+  {{ block.super }}
+  <button id="admin-notes-toggle" class="admin-notes-toggle" type="button" aria-controls="admin-notes-drawer">
+    Admin Notes
+  </button>
+  <div id="admin-notes-overlay" class="admin-notes-overlay" hidden></div>
+  <aside id="admin-notes-drawer" class="admin-notes-drawer" aria-hidden="true">
+    <div class="admin-notes-drawer-head">
+      <strong>Admin Notes</strong>
+      <button id="admin-notes-close" class="admin-notes-close" type="button" aria-label="Close notes panel">
+        ×
+      </button>
+    </div>
+    <iframe
+      id="admin-notes-frame"
+      class="admin-notes-frame"
+      title="Admin notes"
+      loading="lazy"
+      data-src="{% url 'admin:handoff_notes' %}"
+    ></iframe>
+  </aside>
+  <script>
+    (function () {
+      const toggle = document.getElementById("admin-notes-toggle");
+      const overlay = document.getElementById("admin-notes-overlay");
+      const drawer = document.getElementById("admin-notes-drawer");
+      const closeBtn = document.getElementById("admin-notes-close");
+      const frame = document.getElementById("admin-notes-frame");
+      if (!toggle || !overlay || !drawer || !closeBtn || !frame) return;
+
+      const openDrawer = () => {
+        if (!frame.getAttribute("src")) {
+          frame.setAttribute("src", frame.dataset.src || "");
+        }
+        overlay.hidden = false;
+        drawer.classList.add("is-open");
+        drawer.setAttribute("aria-hidden", "false");
+      };
+
+      const closeDrawer = () => {
+        drawer.classList.remove("is-open");
+        drawer.setAttribute("aria-hidden", "true");
+        overlay.hidden = true;
+      };
+
+      toggle.addEventListener("click", openDrawer);
+      closeBtn.addEventListener("click", closeDrawer);
+      overlay.addEventListener("click", closeDrawer);
+      document.addEventListener("keydown", (event) => {
+        if (event.key === "Escape" && drawer.classList.contains("is-open")) {
+          closeDrawer();
+        }
+      });
+    })();
+  </script>
+{% endblock %}

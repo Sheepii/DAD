@@ -28,6 +28,7 @@ from .drive import upload_mockup_bytes_to_bucket
 from .schedule_sync import backfill_scheduled_designs
 from .models import (
     AdminNote,
+    AdminNoteImage,
     Attachment,
     AppSettings,
     DesignFile,
@@ -50,6 +51,7 @@ from .models import (
 from .drive import (
     get_dump_zone_folder_id,
     ensure_store_drive_folders,
+    upload_admin_note_image_bytes,
     upload_design_file,
     upload_template_asset,
     upload_template_asset_bytes,
@@ -465,15 +467,48 @@ def mockup_studio_view(request):
 
 
 def admin_notes_view(request):
-    form = AdminNoteForm(request.POST or None)
-    notes = AdminNote.objects.select_related("author")[:200]
+    form = AdminNoteForm(request.POST or None, request.FILES or None)
+    notes = AdminNote.objects.select_related("author").prefetch_related("images")[:200]
     if request.method == "POST":
         if form.is_valid():
             note = form.save(commit=False)
             if request.user.is_authenticated:
                 note.author = request.user
             note.save()
-            messages.success(request, "Note saved.")
+            uploaded_count = 0
+            failed_count = 0
+            for uploaded in request.FILES.getlist("images"):
+                content_type = (uploaded.content_type or "").lower()
+                if content_type and not content_type.startswith("image/"):
+                    failed_count += 1
+                    continue
+                try:
+                    file_id = upload_admin_note_image_bytes(
+                        uploaded.read(),
+                        uploaded.name or "note-image.png",
+                        note_date=timezone.localdate(),
+                        mime_type=content_type or "image/png",
+                    )
+                    AdminNoteImage.objects.create(
+                        note=note,
+                        drive_file_id=file_id,
+                        filename=uploaded.name or "",
+                    )
+                    uploaded_count += 1
+                except Exception:
+                    failed_count += 1
+
+            if uploaded_count and failed_count:
+                messages.warning(
+                    request,
+                    f"Note saved with {uploaded_count} image(s); {failed_count} failed.",
+                )
+            elif uploaded_count:
+                messages.success(request, f"Note saved with {uploaded_count} image(s).")
+            elif failed_count:
+                messages.warning(request, "Note saved, but image upload failed.")
+            else:
+                messages.success(request, "Note saved.")
             return redirect(reverse("admin:handoff_notes"))
     context = dict(
         admin.site.each_context(request),

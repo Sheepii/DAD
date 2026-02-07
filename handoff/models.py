@@ -654,6 +654,21 @@ class AdminNote(models.Model):
         return self.title or f"Admin note ({timestamp})"
 
 
+class AdminNoteImage(models.Model):
+    note = models.ForeignKey(
+        AdminNote, on_delete=models.CASCADE, related_name="images"
+    )
+    drive_file_id = models.CharField(max_length=200)
+    filename = models.CharField(max_length=255, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["id"]
+
+    def __str__(self) -> str:
+        return self.filename or self.drive_file_id
+
+
 class RecurringTask(models.Model):
     title = models.CharField(max_length=200)
     assigned_to = models.CharField(max_length=100, default="Dad")

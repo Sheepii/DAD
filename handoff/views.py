@@ -1,3 +1,4 @@
+import calendar
 import datetime
 import os
 import tempfile
@@ -246,57 +247,96 @@ def summary(request):
 def store_calendars(request):
     stores = list(_get_user_stores(request))
     today = timezone.localdate()
-    horizon_days = 14
-    horizon = today + datetime.timedelta(days=horizon_days)
+    month_str = request.GET.get("month")
+    if month_str:
+        try:
+            year, month = [int(x) for x in month_str.split("-")]
+            current = datetime.date(year, month, 1)
+        except (TypeError, ValueError):
+            current = datetime.date(today.year, today.month, 1)
+    else:
+        current = datetime.date(today.year, today.month, 1)
+
+    next_month = (current.replace(day=28) + datetime.timedelta(days=4)).replace(day=1)
+    month_after_next = (next_month.replace(day=28) + datetime.timedelta(days=4)).replace(day=1)
+    sync_from = current - datetime.timedelta(days=7)
+    sync_to = month_after_next + datetime.timedelta(days=7)
+
     if request.user.is_staff or request.user.is_superuser:
-        backfill_scheduled_designs(date_from=today, date_to=horizon)
+        backfill_scheduled_designs(date_from=sync_from, date_to=sync_to)
     else:
         for store in stores:
-            backfill_scheduled_designs(store=store, date_from=today, date_to=horizon)
+            backfill_scheduled_designs(store=store, date_from=sync_from, date_to=sync_to)
 
     scheduled_qs = ScheduledDesign.objects.filter(
-        due_date__gte=today, due_date__lt=horizon
+        due_date__gte=sync_from, due_date__lte=sync_to
     ).select_related("recurring_task", "store").order_by("due_date")
-    if not (request.user.is_staff or request.user.is_superuser):
-        if stores:
-            scheduled_qs = scheduled_qs.filter(store__in=stores)
-        else:
-            scheduled_qs = scheduled_qs.none()
+    if request.user.is_staff or request.user.is_superuser:
+        pass
+    elif stores:
+        scheduled_qs = scheduled_qs.filter(store__in=stores)
+    else:
+        scheduled_qs = scheduled_qs.none()
 
-    limit_per_store = 7
-    buckets: dict[int | None, list[dict[str, object]]] = {store.id: [] for store in stores}
-    general_bucket: list[dict[str, object]] = []
-
+    scheduled_by_store: dict[int | None, dict[datetime.date, list[dict]]] = {}
     for sd in scheduled_qs:
-        if sd.store_id is None:
-            target = general_bucket
-        elif sd.store_id in buckets:
-            target = buckets[sd.store_id]
-        else:
-            continue
-        if len(target) >= limit_per_store:
-            continue
-        target.append(
+        store_id = sd.store_id
+        day_map = scheduled_by_store.setdefault(store_id, {})
+        day_map.setdefault(sd.due_date, []).append(
             {
-                "due_date": sd.due_date,
-                "label": sd.recurring_task.title if sd.recurring_task else "Scheduled design",
+                "id": sd.id,
                 "design_id": sd.drive_design_file_id,
-                "thumb": f"https://drive.google.com/thumbnail?id={sd.drive_design_file_id}&sz=w100",
+                "label": sd.recurring_task.title if sd.recurring_task else "Design",
+                "thumb": f"https://drive.google.com/thumbnail?id={sd.drive_design_file_id}&sz=w120",
             }
         )
 
+    cal = calendar.Calendar(firstweekday=0)
     previews = []
-    if general_bucket:
-        previews.append({"store": None, "items": general_bucket, "title": "All stores"})
+
+    if scheduled_by_store.get(None):
+        weeks = []
+        day_map = scheduled_by_store.get(None, {})
+        for week in cal.monthdatescalendar(current.year, current.month):
+            week_cells = []
+            for day in week:
+                week_cells.append(
+                    {
+                        "date": day,
+                        "in_month": day.month == current.month,
+                        "scheduled_items": day_map.get(day, []),
+                    }
+                )
+            weeks.append(week_cells)
+        previews.append({"store": None, "title": "All stores", "weeks": weeks})
+
     for store in stores:
-        previews.append({"store": store, "items": buckets.get(store.id, []), "title": store.name})
+        weeks = []
+        day_map = scheduled_by_store.get(store.id, {})
+        for week in cal.monthdatescalendar(current.year, current.month):
+            week_cells = []
+            for day in week:
+                week_cells.append(
+                    {
+                        "date": day,
+                        "in_month": day.month == current.month,
+                        "scheduled_items": day_map.get(day, []),
+                    }
+                )
+            weeks.append(week_cells)
+        previews.append({"store": store, "title": store.name, "weeks": weeks})
+
+    prev_month = (current.replace(day=1) - datetime.timedelta(days=1)).replace(day=1)
 
     return render(
         request,
         "handoff/store_calendars.html",
         {
             "previews": previews,
-            "horizon_days": horizon_days,
+            "month_label": current.strftime("%B %Y"),
+            "month_value": f"{current.year}-{current.month:02d}",
+            "prev_month": f"{prev_month.year}-{prev_month.month:02d}",
+            "next_month": f"{next_month.year}-{next_month.month:02d}",
         },
     )
 
@@ -537,8 +577,42 @@ def etsy_listing_preview(request, task_id: int):
     )
     context = _build_mockup_context(task)
     context["task"] = task
-    slots = task.mockup_slots.exclude(drive_file_id="").order_by("order")
-    context["mockup_slots"] = slots
+    etsy_photos = []
+    for card in context.get("mockup_cards", []):
+        if card.get("kind") == "slot":
+            slot = card.get("slot")
+            fallback_image_id = card.get("fallback_image_id")
+            if not slot:
+                continue
+            photo_id = slot.drive_file_id or fallback_image_id
+            if not photo_id:
+                continue
+            etsy_photos.append(
+                {
+                    "kind": "slot",
+                    "is_video": False,
+                    "drive_file_id": photo_id,
+                    "label": slot.label or f"Photo {slot.order}",
+                    "caption": slot.filename or "",
+                    "updated_at": slot.updated_at,
+                }
+            )
+            continue
+
+        extra = card.get("extra")
+        if not extra or not extra.get("drive_file_id"):
+            continue
+        etsy_photos.append(
+            {
+                "kind": "static",
+                "is_video": bool(extra.get("is_video")),
+                "drive_file_id": extra.get("drive_file_id"),
+                "label": extra.get("label") or "Static",
+                "caption": extra.get("filename") or "",
+                "include_in_mockup_zip": bool(extra.get("include_in_mockup_zip", True)),
+            }
+        )
+    context["etsy_photos"] = etsy_photos
     context["listing_title"] = task.etsy_title or task.title
     context["listing_description"] = (task.etsy_description or "").strip()
     context["listing_tags"] = format_tags_csv(task.etsy_tags or [])
