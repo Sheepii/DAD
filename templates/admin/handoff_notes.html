@@ -1,0 +1,54 @@
+﻿{% extends "admin/base_site.html" %}
+{% load i18n %}
+
+{% block content %}
+  <div class="notes-page">
+    <header class="notes-header">
+      <h1>Admin Notes</h1>
+      <p class="notes-callout">Save quick thoughts for the team or yourself.</p>
+    </header>
+
+    <section class="notes-form-card">
+      <form method="post" novalidate>
+        {% csrf_token %}
+        {{ form.non_field_errors }}
+        <div class="note-form-field">
+          {{ form.title.label_tag }}
+          {{ form.title }}
+          {% if form.title.errors %}
+            <p class="note-error">{{ form.title.errors.0 }}</p>
+          {% endif %}
+        </div>
+        <div class="note-form-field">
+          {{ form.body.label_tag }}
+          {{ form.body }}
+          {% if form.body.errors %}
+            <p class="note-error">{{ form.body.errors.0 }}</p>
+          {% endif %}
+        </div>
+        <button type="submit" class="default">Save note</button>
+      </form>
+    </section>
+
+    <section class="notes-list">
+      {% for note in notes %}
+        <article class="note-card">
+          <header class="note-card-header">
+            <div class="note-card-title">
+              {{ note.title|default:"Untitled note" }}
+            </div>
+            <span class="note-meta">
+              {{ note.created_at|date:"M d, Y H:i" }}
+              {% if note.author %}· {{ note.author.get_username }}{% endif %}
+            </span>
+          </header>
+          <div class="note-body">{{ note.body|linebreaksbr }}</div>
+        </article>
+      {% empty %}
+        <div class="note-empty">
+          <p>{% translate "No notes yet." %}</p>
+        </div>
+      {% endfor %}
+    </section>
+  </div>
+{% endblock %}

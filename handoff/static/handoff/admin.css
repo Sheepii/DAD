@@ -40,3 +40,92 @@
 .handoff-item a {
   text-decoration: none;
 }
+
+.notes-page {
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 12px;
+  padding: 24px;
+  max-width: 960px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.notes-header h1 {
+  margin: 0;
+}
+
+.notes-callout {
+  margin: 4px 0 0;
+  color: #b9c7d4;
+}
+
+.notes-form-card {
+  background: rgba(0, 0, 0, 0.35);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 10px;
+  padding: 16px;
+}
+
+.note-form-field {
+  margin-bottom: 12px;
+}
+
+.note-form-field label {
+  font-weight: 600;
+}
+
+.note-form-field .wide {
+  width: 100%;
+}
+
+.note-error {
+  margin: 4px 0 0;
+  color: #ffaa99;
+  font-size: 0.85em;
+}
+
+.notes-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.note-card {
+  padding: 16px;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(0, 0, 0, 0.35);
+}
+
+.note-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+
+.note-card-title {
+  font-weight: 600;
+}
+
+.note-meta {
+  font-size: 0.85em;
+  color: #b9c7d4;
+}
+
+.note-body {
+  white-space: pre-wrap;
+  line-height: 1.4;
+}
+
+.note-empty {
+  padding: 16px;
+  border-radius: 10px;
+  border: 1px dashed rgba(255, 255, 255, 0.2);
+  text-align: center;
+  color: #b9c7d4;
+}

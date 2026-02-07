@@ -49,15 +49,18 @@
             </ul>
           </div>
 
-          <div class="handoff-group">
-            <div class="handoff-group-title">System</div>
-            <ul class="handoff-list">
-              <li class="handoff-item">
-                <a href="/admin/handoff/schedule/">Design Schedule</a>
-              </li>
-              <li class="handoff-item">
-                <a href="/admin/handoff/deploy/">Deploy Latest</a>
-              </li>
+            <div class="handoff-group">
+              <div class="handoff-group-title">System</div>
+              <ul class="handoff-list">
+                <li class="handoff-item">
+                  <a href="/admin/handoff/schedule/">Design Schedule</a>
+                </li>
+                <li class="handoff-item">
+                  <a href="/admin/handoff/notes/">Admin Notes</a>
+                </li>
+                <li class="handoff-item">
+                  <a href="/admin/handoff/deploy/">Deploy Latest</a>
+                </li>
               {% for model in app.models %}
                 {% if model.object_name|lower in "appsettings,store,storemembership" %}
                   <li class="handoff-item">

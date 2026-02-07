@@ -4,7 +4,7 @@ from django.conf import settings
 from django.utils import timezone
 
 from django.utils.safestring import mark_safe
-from django.urls import path
+from django.urls import path, reverse
 from django.shortcuts import render, redirect
 from django.utils import timezone
 import calendar
@@ -14,6 +14,7 @@ from django.core.management import call_command
 import subprocess
 
 from .forms import (
+    AdminNoteForm,
     MockupTemplateForm,
     RecurringTaskForm,
     TaskTemplateForm,
@@ -25,6 +26,7 @@ from .design_workflow import ensure_emergency_design
 from .mockup_generator import generate_mockup_bytes_for_template
 from .drive import upload_mockup_bytes_to_bucket
 from .models import (
+    AdminNote,
     Attachment,
     AppSettings,
     DesignFile,
@@ -457,10 +459,30 @@ def mockup_studio_view(request):
     return render(request, "admin/handoff_mockup_studio.html", context)
 
 
+def admin_notes_view(request):
+    form = AdminNoteForm(request.POST or None)
+    notes = AdminNote.objects.select_related("author")[:200]
+    if request.method == "POST":
+        if form.is_valid():
+            note = form.save(commit=False)
+            if request.user.is_authenticated:
+                note.author = request.user
+            note.save()
+            messages.success(request, "Note saved.")
+            return redirect(reverse("admin:handoff_notes"))
+    context = dict(
+        admin.site.each_context(request),
+        form=form,
+        notes=notes,
+    )
+    return render(request, "admin/handoff_notes.html", context)
+
+
 def _get_urls():
     urls = _orig_get_urls()
     custom = [
         path("handoff/schedule/", admin.site.admin_view(handoff_schedule_view), name="handoff_schedule"),
+        path("handoff/notes/", admin.site.admin_view(admin_notes_view), name="handoff_notes"),
         path("handoff/deploy/", admin.site.admin_view(deploy_latest_view), name="handoff_deploy_latest"),
         path("handoff/template-attachment/upload/", admin.site.admin_view(upload_template_attachment_view), name="handoff_template_attachment_upload"),
         path("handoff/open-dump/", admin.site.admin_view(open_dump_folder_view), name="handoff_open_dump_folder"),
@@ -851,6 +873,19 @@ class AppSettingsAdmin(admin.ModelAdmin):
         "auto_generate_mockups",
         "updated_at",
     )
+
+
+@admin.register(AdminNote)
+class AdminNoteAdmin(admin.ModelAdmin):
+    list_display = ("title_display", "author", "created_at")
+    list_filter = ("author",)
+    search_fields = ("title", "body")
+    readonly_fields = ("created_at", "updated_at")
+    ordering = ("-created_at",)
+
+    def title_display(self, obj):
+        return obj.title or "(untitled)"
+    title_display.short_description = "Title"
 
 
 @admin.register(ScheduledDesign)

@@ -633,6 +633,27 @@ class AppSettings(models.Model):
         super().save(*args, **kwargs)
 
 
+class AdminNote(models.Model):
+    title = models.CharField(max_length=200, blank=True)
+    body = models.TextField()
+    author = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="admin_notes",
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+
+    def __str__(self) -> str:
+        timestamp = self.created_at.strftime("%Y-%m-%d %H:%M")
+        return self.title or f"Admin note ({timestamp})"
+
+
 class RecurringTask(models.Model):
     title = models.CharField(max_length=200)
     assigned_to = models.CharField(max_length=100, default="Dad")

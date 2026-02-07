@@ -7,6 +7,7 @@ from django.utils import timezone
 
 from .models import (
     MockupTemplate,
+    AdminNote,
     RecurringTask,
     Task,
     TaskTemplate,
@@ -239,3 +240,13 @@ class TemplateAttachmentForm(forms.ModelForm):
         if not re.match(r"^[A-Za-z0-9_-]{15,}$", value):
             raise forms.ValidationError("Enter a valid Google Drive file ID or upload a file.")
         return value
+
+
+class AdminNoteForm(forms.ModelForm):
+    class Meta:
+        model = AdminNote
+        fields = ["title", "body"]
+        widgets = {
+            "title": forms.TextInput(attrs={"class": "vTextField wide"}),
+            "body": forms.Textarea(attrs={"class": "vLargeTextField wide", "rows": 6}),
+        }
