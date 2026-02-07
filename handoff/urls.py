@@ -8,6 +8,7 @@ urlpatterns = [
     path("", views.home, name="home"),
     path("today/", views.today, name="today"),
     path("summary/", views.summary, name="summary"),
+    path("stores/", views.store_calendars, name="store_calendars"),
     path("runway/", views.runway_status, name="runway_status"),
     path("sops/", views.sop_library, name="sop_library"),
     path("create/", views.create_task, name="create_task"),

@@ -79,6 +79,9 @@
           <a class="btn btn-outline-primary btn-sm" href="{% url 'handoff:summary' %}{% if current_store %}?store={{ current_store.id }}{% endif %}">
             Summary
           </a>
+          <a class="btn btn-outline-primary btn-sm" href="{% url 'handoff:store_calendars' %}{% if current_store %}?store={{ current_store.id }}{% endif %}">
+            Store calendars
+          </a>
           <a class="btn btn-outline-info btn-sm" href="{% url 'handoff:sop_library' %}">
             SOPs
           </a>

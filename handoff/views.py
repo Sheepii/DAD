@@ -1,3 +1,4 @@
+import datetime
 import os
 import tempfile
 
@@ -228,6 +229,60 @@ def summary(request):
             "in_progress": in_progress,
             "new": new,
             "store": store,
+        },
+    )
+
+
+@login_required
+def store_calendars(request):
+    stores = list(_get_user_stores(request))
+    today = timezone.localdate()
+    horizon_days = 14
+    horizon = today + datetime.timedelta(days=horizon_days)
+
+    scheduled_qs = ScheduledDesign.objects.filter(
+        due_date__gte=today, due_date__lt=horizon
+    ).select_related("recurring_task", "store").order_by("due_date")
+    if not (request.user.is_staff or request.user.is_superuser):
+        if stores:
+            scheduled_qs = scheduled_qs.filter(store__in=stores)
+        else:
+            scheduled_qs = scheduled_qs.none()
+
+    limit_per_store = 7
+    buckets: dict[int | None, list[dict[str, object]]] = {store.id: [] for store in stores}
+    general_bucket: list[dict[str, object]] = []
+
+    for sd in scheduled_qs:
+        if sd.store_id is None:
+            target = general_bucket
+        elif sd.store_id in buckets:
+            target = buckets[sd.store_id]
+        else:
+            continue
+        if len(target) >= limit_per_store:
+            continue
+        target.append(
+            {
+                "due_date": sd.due_date,
+                "label": sd.recurring_task.title if sd.recurring_task else "Scheduled design",
+                "design_id": sd.drive_design_file_id,
+                "thumb": f"https://drive.google.com/thumbnail?id={sd.drive_design_file_id}&sz=w100",
+            }
+        )
+
+    previews = []
+    if general_bucket:
+        previews.append({"store": None, "items": general_bucket, "title": "All stores"})
+    for store in stores:
+        previews.append({"store": store, "items": buckets.get(store.id, []), "title": store.name})
+
+    return render(
+        request,
+        "handoff/store_calendars.html",
+        {
+            "previews": previews,
+            "horizon_days": horizon_days,
         },
     )
 
