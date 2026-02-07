@@ -1,0 +1,193 @@
+{% extends "handoff/base.html" %}
+
+{% block title %}Design Idea Dump{% endblock %}
+
+{% block content %}
+  <div class="row g-3">
+    <div class="col-12 col-lg-5">
+      <div class="card shadow-sm">
+        <div class="card-body">
+          <h1 class="h4 mb-1">Design idea dump</h1>
+          <p class="text-muted small mb-3">
+            Save sketches, mockups, or pasted screenshots with optional notes. Focus the paste area below and press ⌘+V / Ctrl+V to capture a screenshot directly from your clipboard.
+          </p>
+          <form method="post" enctype="multipart/form-data">
+            {% csrf_token %}
+            <div class="mb-3">
+              {{ form.title.label_tag }}
+              {{ form.title }}
+              {% if form.title.errors %}
+                <div class="text-danger small mt-1">{{ form.title.errors|join:", " }}</div>
+              {% endif %}
+            </div>
+            <div class="mb-3">
+              {{ form.notes.label_tag }}
+              {{ form.notes }}
+              {% if form.notes.errors %}
+                <div class="text-danger small mt-1">{{ form.notes.errors|join:", " }}</div>
+              {% endif %}
+            </div>
+            <div class="mb-3">
+              <label class="form-label small text-muted">Paste screenshot / drop image</label>
+              <div
+                id="idea-paste-area"
+                tabindex="0"
+                class="border border-secondary rounded-3 p-3 text-center text-muted bg-white"
+                style="border-style: dashed; cursor: pointer;"
+              >
+                <div class="fw-semibold">Paste (Ctrl+V / ⌘+V) or drop an image</div>
+                <div class="small">The screenshot will attach to the idea entry.</div>
+              </div>
+            </div>
+            <div class="mb-3">
+              <label class="form-label small text-muted" for="id_image">Screenshot (optional)</label>
+              <div class="d-flex gap-2 align-items-start">
+                {{ form.image }}
+                <button type="button" class="btn btn-outline-secondary btn-sm" id="idea-clear-image">Clear</button>
+              </div>
+              {% if form.image.errors %}
+                <div class="text-danger small mt-1">{{ form.image.errors|join:", " }}</div>
+              {% endif %}
+              <div class="mt-2">
+                <img
+                  id="idea-image-preview"
+                  class="img-fluid rounded border d-none"
+                  style="max-height: 220px;"
+                  alt="Screenshot preview"
+                />
+              </div>
+            </div>
+            <div class="d-grid">
+              <button class="btn btn-primary" type="submit">Save idea</button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+    <div class="col-12 col-lg-7">
+      <div class="card shadow-sm">
+        <div class="card-body">
+          <h5 class="card-title mb-3">Recent ideas</h5>
+          {% if ideas %}
+            <div class="row g-3">
+              {% for idea in ideas %}
+                <div class="col-12">
+                  <div class="border rounded-3 p-3 bg-white shadow-sm">
+                    <div class="d-flex justify-content-between align-items-start">
+                      <div>
+                        <strong>{{ idea.title }}</strong>
+                        <div class="small text-muted">
+                          {{ idea.created_at|date:"M j, Y g:i A" }}
+                          {% if idea.created_by %}· {{ idea.created_by.get_username }}{% endif %}
+                        </div>
+                      </div>
+                      {% if idea.image %}
+                        <a
+                          class="btn btn-outline-secondary btn-sm"
+                          href="{{ idea.image.url }}"
+                          target="_blank"
+                          rel="noopener"
+                        >
+                          Open image
+                        </a>
+                      {% endif %}
+                    </div>
+                    {% if idea.notes %}
+                      <p class="mt-2 mb-2">{{ idea.notes|linebreaksbr }}</p>
+                    {% endif %}
+                    {% if idea.image %}
+                      <img
+                        src="{{ idea.image.url }}?{{ idea.updated_at|date:'U' }}"
+                        class="img-fluid rounded border"
+                        style="max-height: 260px;"
+                        alt="{{ idea.title }}"
+                        loading="lazy"
+                      />
+                    {% endif %}
+                  </div>
+                </div>
+              {% endfor %}
+            </div>
+          {% else %}
+            <div class="text-muted small">
+              No idea entries yet. Paste a screenshot above to start collecting inspiration.
+            </div>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    (function () {
+      const pasteArea = document.getElementById("idea-paste-area");
+      const imageInput = document.getElementById("id_image");
+      const preview = document.getElementById("idea-image-preview");
+      const clearButton = document.getElementById("idea-clear-image");
+
+      const updatePreview = (file) => {
+        if (!preview) return;
+        if (!file) {
+          preview.classList.add("d-none");
+          preview.src = "";
+          return;
+        }
+        const url = URL.createObjectURL(file);
+        preview.src = url;
+        preview.classList.remove("d-none");
+        preview.onload = () => URL.revokeObjectURL(url);
+      };
+
+      const handleFile = (file) => {
+        if (!file || !imageInput) return;
+        const dt = new DataTransfer();
+        dt.items.add(file);
+        imageInput.files = dt.files;
+        updatePreview(file);
+      };
+
+      const handlePaste = (event) => {
+        const items = event.clipboardData ? event.clipboardData.items : [];
+        for (const item of items) {
+          if (item.type.startsWith("image/")) {
+            const blob = item.getAsFile();
+            if (blob) {
+              event.preventDefault();
+              handleFile(blob);
+              return;
+            }
+          }
+        }
+      };
+
+      const handleDrop = (event) => {
+        event.preventDefault();
+        if (event.dataTransfer && event.dataTransfer.files.length) {
+          handleFile(event.dataTransfer.files[0]);
+        }
+      };
+
+      if (pasteArea) {
+        pasteArea.addEventListener("paste", handlePaste);
+        pasteArea.addEventListener("drop", handleDrop);
+        pasteArea.addEventListener("dragover", (event) => event.preventDefault());
+        pasteArea.addEventListener("click", () => imageInput?.click());
+      }
+
+      if (imageInput) {
+        imageInput.addEventListener("change", () => {
+          handleFile(imageInput.files[0]);
+        });
+      }
+
+      if (clearButton) {
+        clearButton.addEventListener("click", () => {
+          if (imageInput) {
+            imageInput.value = "";
+          }
+          updatePreview(null);
+        });
+      }
+    })();
+  </script>
+{% endblock %}

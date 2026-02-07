@@ -18,16 +18,296 @@
     </div>
   </div>
 
-  <div class="row g-3">
-    <div class="col-12 col-lg-7">
-      <div class="card shadow-sm">
-        <div class="card-body">
-          <div class="d-flex justify-content-between align-items-center mb-2">
-            <h5 class="card-title mb-0">Photos</h5>
-            <div class="text-muted small">
-              {{ etsy_photos|length }} total
+  <style>
+    .etsy-preview-shell {
+      background: #f4f4f4;
+      padding: 1rem;
+      border-radius: 1rem;
+      display: flex;
+      flex-direction: column;
+      gap: 1.25rem;
+    }
+    .preview-card {
+      background: #fff;
+      border-radius: 1rem;
+      padding: 1.5rem;
+      box-shadow: 0 12px 30px rgba(0, 0, 0, 0.08);
+      border: 1px solid #ececec;
+    }
+    .preview-card-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 0.75rem;
+      margin-bottom: 1rem;
+      flex-wrap: wrap;
+    }
+    .preview-callout {
+      color: #6b7280;
+      font-size: 0.9rem;
+    }
+    .preview-field {
+      margin-bottom: 0.75rem;
+      display: flex;
+      flex-direction: column;
+      gap: 0.35rem;
+    }
+    .preview-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+      gap: 1rem;
+    }
+    .photo-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+      gap: 0.75rem;
+    }
+    .photo-tile {
+      border: 1px solid #e4e4e4;
+      border-radius: 0.75rem;
+      overflow: hidden;
+      background: #f9f9f9;
+      display: flex;
+      flex-direction: column;
+      min-height: 160px;
+    }
+    .photo-media {
+      width: 100%;
+      height: 160px;
+      object-fit: cover;
+      display: block;
+      background: #ddd;
+    }
+    .photo-meta {
+      padding: 0.65rem 0.75rem;
+    }
+    .store-card {
+      border-radius: 0.85rem;
+      border: 1px solid #e5e5e5;
+      padding: 1rem;
+      background: #fafafa;
+    }
+  </style>
+
+  <div class="etsy-preview-shell">
+    <div class="preview-card">
+      <div class="preview-card-header">
+        <div>
+          <div class="text-muted small">Listing title</div>
+          <div class="preview-callout">First lines are what shoppers see on mobile.</div>
+        </div>
+        <button class="btn btn-outline-secondary btn-sm" type="button" id="copy-title">Copy</button>
+      </div>
+      <div class="preview-field">
+        <input class="form-control" id="listing-title" maxlength="140" placeholder="Etsy title (max 140 chars)" />
+      </div>
+      <div class="preview-grid">
+        <div class="preview-field">
+          <label class="form-label small text-muted mb-1" for="listing-price">Price</label>
+          <input class="form-control form-control-sm" id="listing-price" inputmode="decimal" placeholder="e.g. 9.99" />
+        </div>
+        <div class="preview-field">
+          <label class="form-label small text-muted mb-1" for="listing-sku">SKU (optional)</label>
+          <input class="form-control form-control-sm" id="listing-sku" placeholder="Optional SKU" />
+        </div>
+      </div>
+    </div>
+
+    <div class="preview-card">
+      <div class="preview-card-header">
+        <div>
+          <h5 class="mb-0">Photos</h5>
+          <div class="text-muted small">{{ etsy_photos|length }} total</div>
+        </div>
+      </div>
+      {% if etsy_photos %}
+        <div class="photo-grid">
+          {% for photo in etsy_photos %}
+            <div class="photo-tile">
+              {% if photo.is_video %}
+                <video
+                  controls
+                  class="photo-media"
+                  preload="metadata"
+                >
+                  <source src="{% url 'handoff:mockup_file_download' photo.drive_file_id %}" />
+                </video>
+              {% else %}
+                <img
+                  src="https://drive.google.com/thumbnail?id={{ photo.drive_file_id }}&sz=w600{% if photo.updated_at %}&t={{ photo.updated_at|date:'U' }}{% endif %}"
+                  alt="{{ photo.label }}"
+                  class="photo-media"
+                  loading="lazy"
+                />
+              {% endif %}
+              <div class="photo-meta">
+                <div class="fw-semibold small">{{ photo.label }}</div>
+                {% if photo.caption %}
+                  <div class="text-muted small">{{ photo.caption }}</div>
+                {% endif %}
+              </div>
             </div>
+          {% endfor %}
+        </div>
+      {% else %}
+        <div class="text-muted small">No mockups uploaded yet. Upload mockups on the task page to see them here.</div>
+      {% endif %}
+    </div>
+
+    <div class="preview-card">
+      <div class="preview-card-header">
+        <div>
+          <h5 class="mb-0">Description</h5>
+          <div class="text-muted small">Copy/paste from your write-up.</div>
+        </div>
+        <button class="btn btn-outline-secondary btn-sm" type="button" id="copy-description">Copy</button>
+      </div>
+      {% if publications %}
+        <div class="mb-3">
+          <label class="form-label small text-muted mb-1" for="store-description-select">Shop</label>
+          <select class="form-select form-select-sm" id="store-description-select">
+            {% for pub in publications %}
+              <option value="{{ pub.store.id }}" {% if pub.store.id == selected_store_id %}selected{% endif %}>
+                {{ pub.store.name }}
+              </option>
+            {% endfor %}
+          </select>
+        </div>
+      {% endif %}
+      <textarea class="form-control font-monospace" id="listing-description" rows="10" placeholder="Paste or write the Etsy description here."></textarea>
+    </div>
+
+    <div class="preview-card">
+      <div class="preview-card-header">
+        <div>
+          <h5 class="mb-0">Tags (13)</h5>
+          <div class="text-muted small">Each tag must be <=20 chars, letters/numbers/spaces only.</div>
+        </div>
+        <div class="d-flex gap-2">
+          <button class="btn btn-sm btn-success" type="button" id="generate-tags">Generate tags</button>
+          <button class="btn btn-sm btn-outline-primary" type="button" id="copy-tags">Copy</button>
+          <button class="btn btn-sm btn-outline-secondary" type="button" id="clear-tags">Clear</button>
+        </div>
+      </div>
+      <textarea
+        class="form-control font-monospace mb-2"
+        id="listing-tags"
+        rows="3"
+        placeholder="tag one, tag two, tag three, ..."
+      ></textarea>
+      <div class="input-group input-group-sm mb-2">
+        <input class="form-control font-monospace" id="tags-normalized" readonly />
+        <button class="btn btn-outline-primary" type="button" id="copy-tags-normalized">Copy</button>
+      </div>
+      <div id="tags-validation" class="mb-2"></div>
+      <div class="text-muted small" id="tags-status"></div>
+    </div>
+
+    {% if sop_guides %}
+      <div class="preview-card">
+        <div class="preview-card-header">
+          <div>
+            <h5 class="mb-0">SOP Help</h5>
           </div>
+          <a class="btn btn-sm btn-outline-secondary" href="{% url 'handoff:sop_library' %}">Library</a>
+        </div>
+        <div class="mb-3">
+          <select class="form-select form-select-sm" id="sop-select">
+            {% for sop in sop_guides %}
+              <option
+                value="{{ sop.id }}"
+                data-embed="{{ sop.embed_url }}"
+                {% if sop.id == selected_sop_id %}selected{% endif %}
+              >
+                {{ sop.name }}
+              </option>
+            {% endfor %}
+          </select>
+        </div>
+        <iframe
+          id="sop-embed"
+          src="{{ selected_sop_embed_url }}"
+          style="width: 100%; height: 420px; border: 0;"
+          allowfullscreen
+          loading="lazy"
+        ></iframe>
+      </div>
+    {% endif %}
+
+    <div class="preview-card">
+      <div class="preview-card-header">
+        <div>
+          <h5 class="mb-0">Stores</h5>
+          <div class="text-muted small">1 design / day per store</div>
+        </div>
+      </div>
+      {% if publications %}
+        <div class="d-grid gap-3" id="stores-panel">
+          {% for pub in publications %}
+            <div class="store-card" data-store-id="{{ pub.store.id }}">
+              <div class="d-flex justify-content-between align-items-center">
+                <div class="fw-semibold">{{ pub.store.name }}</div>
+                <span class="badge {% if pub.status == 'LISTED' %}bg-success{% else %}bg-secondary{% endif %}">
+                  {{ pub.get_status_display }}
+                </span>
+              </div>
+              <div class="row g-2 mt-3">
+                <div class="col-6">
+                  <label class="form-label small text-muted mb-1">Status</label>
+                  <select class="form-select form-select-sm store-status">
+                    <option value="QUEUED" {% if pub.status == 'QUEUED' %}selected{% endif %}>Queued</option>
+                    <option value="LISTED" {% if pub.status == 'LISTED' %}selected{% endif %}>Listed</option>
+                  </select>
+                </div>
+                <div class="col-6">
+                  <label class="form-label small text-muted mb-1">Listing URL</label>
+                  <input class="form-control form-control-sm store-url" value="{{ pub.listing_url }}" placeholder="https://www.etsy.com/listing/..." />
+                </div>
+              </div>
+              {% if pub.listed_at %}
+                <div class="text-muted small mt-2">Listed at {{ pub.listed_at|date:"M j, Y g:i A" }}</div>
+              {% endif %}
+            </div>
+          {% endfor %}
+        </div>
+        <div class="text-muted small mt-2">
+          Tip: paste the Etsy listing URL after publishing to revisit it later.
+        </div>
+      {% else %}
+        <div class="text-muted small">
+          No active stores configured yet. Add them in Admin → Stores.
+        </div>
+      {% endif %}
+    </div>
+
+    <div class="preview-card">
+      <div class="preview-card-header">
+        <div>
+          <h5 class="mb-0">Design links</h5>
+        </div>
+      </div>
+      {% if task.drive_design_file_id %}
+        <div class="d-flex flex-wrap gap-2">
+          <a
+            class="btn btn-outline-secondary btn-sm"
+            href="https://drive.google.com/file/d/{{ task.drive_design_file_id }}/view"
+            target="_blank"
+            rel="noopener"
+          >
+            Open design
+          </a>
+          <a
+            class="btn btn-outline-primary btn-sm"
+            href="https://drive.google.com/uc?export=download&id={{ task.drive_design_file_id }}"
+          >
+            Download
+          </a>
+        </div>
+      {% else %}
+        <div class="text-muted small">No design file set on this task yet.</div>
+      {% endif %}
+    </div>
+  </div>
 
           {% if etsy_photos %}
             <div class="row g-2">
@@ -82,6 +362,18 @@
       <div class="card shadow-sm mt-3">
         <div class="card-body">
           <h5 class="card-title">Description</h5>
+          {% if publications %}
+            <div class="mb-2">
+              <label class="form-label small text-muted mb-1" for="store-description-select">Shop</label>
+              <select class="form-select form-select-sm" id="store-description-select">
+                {% for pub in publications %}
+                  <option value="{{ pub.store.id }}" {% if pub.store.id == selected_store_id %}selected{% endif %}>
+                    {{ pub.store.name }}
+                  </option>
+                {% endfor %}
+              </select>
+            </div>
+          {% endif %}
           <div class="d-flex gap-2 mb-2">
             <button class="btn btn-outline-primary btn-sm" type="button" id="copy-description">Copy</button>
             <div class="text-muted small align-self-center">Copy/paste into Etsy (defaults from template)</div>
@@ -275,6 +567,10 @@
       const tagsStatus = document.getElementById("tags-status");
       const tagsValidation = document.getElementById("tags-validation");
       const saveStatus = document.getElementById("save-status");
+      const storeDescriptionSelect = document.getElementById("store-description-select");
+      let activeStoreId = "";
+      let storeDescriptionCache = {};
+      let generalFallbackDescription = "";
 
       function readDefaults() {
         const titleNode = document.getElementById("default-title");
@@ -284,6 +580,30 @@
         const desc = descNode ? JSON.parse(descNode.textContent || "\"\"") : "";
         const tags = tagsNode ? JSON.parse(tagsNode.textContent || "\"\"") : "";
         return { title, desc, tags };
+      }
+
+      function parseJsonScript(elementId, fallback) {
+        const node = document.getElementById(elementId);
+        if (!node) return fallback;
+        try {
+          return JSON.parse(node.textContent || "null");
+        } catch {
+          return fallback;
+        }
+      }
+
+      function applyStoreDescription(storeId, overrideDescription, fallback) {
+        if (!descInput) return;
+        if (overrideDescription !== null && overrideDescription !== undefined) {
+          descInput.value = overrideDescription;
+          return;
+        }
+        const effectiveFallback = fallback ?? generalFallbackDescription;
+        if (storeId && Object.prototype.hasOwnProperty.call(storeDescriptionCache, storeId)) {
+          descInput.value = storeDescriptionCache[storeId] ?? "";
+          return;
+        }
+        descInput.value = effectiveFallback || "";
       }
 
       function loadState() {
@@ -301,6 +621,7 @@
           title: titleInput ? titleInput.value : "",
           description: descInput ? descInput.value : "",
           tags: tagsInput ? tagsInput.value : "",
+          store_id: activeStoreId || null,
         };
         try {
           localStorage.setItem(storageKey, JSON.stringify(state));
@@ -419,6 +740,7 @@
         const title = titleInput ? titleInput.value : "";
         const description = descInput ? descInput.value : "";
         const tags = tagsInput ? tagsInput.value : "";
+        const storeIdForPayload = activeStoreId || null;
         setSaveStatus("Saving...", "muted");
         try {
           const res = await fetch(`/task/${taskId}/etsy/save/`, {
@@ -428,13 +750,21 @@
               Accept: "application/json",
               ...(getCsrfToken() ? { "X-CSRFToken": getCsrfToken() } : {}),
             },
-            body: JSON.stringify({ title, description, tags }),
+            body: JSON.stringify({ title, description, tags, store_id: storeIdForPayload }),
           });
           const payload = await res.json().catch(() => ({}));
           if (!res.ok || !payload.ok) {
             const msg = payload.error || (payload.errors ? payload.errors.join(" ") : "Save failed.");
             setSaveStatus(msg, "error");
             return;
+          }
+          const payloadStoreId =
+            payload.store_id !== undefined && payload.store_id !== null ? String(payload.store_id) : null;
+          if (payloadStoreId) {
+            storeDescriptionCache[payloadStoreId] = payload.store_description ?? "";
+            if (payloadStoreId === activeStoreId && descInput) {
+              descInput.value = payload.store_description ?? "";
+            }
           }
           const storesPanel = document.getElementById("stores-panel");
           if (storesPanel) {
@@ -518,9 +848,19 @@
 
         const defaults = readDefaults();
         const state = loadState();
+        const storedStoreId = state && state.store_id != null ? String(state.store_id) : "";
+        const scriptDescriptions = parseJsonScript("store-description-data", {});
+        storeDescriptionCache = scriptDescriptions || {};
+        generalFallbackDescription = defaults.desc || "";
+        const initialStoreId = storedStoreId || (storeDescriptionSelect ? storeDescriptionSelect.value : "");
+        activeStoreId = initialStoreId || "";
         if (titleInput) titleInput.value = (state && state.title) || defaults.title || "";
-        if (descInput) descInput.value = (state && state.description) || defaults.desc || "";
         if (tagsInput) tagsInput.value = (state && state.tags) || defaults.tags || "";
+        const descOverride =
+          state && state.store_id != null && String(state.store_id) === activeStoreId
+            ? state.description
+            : null;
+        applyStoreDescription(activeStoreId, descOverride, defaults.desc);
 
         refreshTags();
 
@@ -556,10 +896,20 @@
           refreshTags();
           saveState();
         });
+
+        if (storeDescriptionSelect) {
+          const handleStoreChange = () => {
+            activeStoreId = storeDescriptionSelect.value;
+            applyStoreDescription(activeStoreId, null, defaults.desc);
+            saveState();
+          };
+          storeDescriptionSelect.addEventListener("change", handleStoreChange);
+        }
       });
     })();
   </script>
   {{ listing_title|default:""|json_script:"default-title" }}
   {{ listing_description|default:""|json_script:"default-desc" }}
   {{ listing_tags|default:""|json_script:"default-tags" }}
+  {{ description_by_store|default:{}|json_script:"store-description-data" }}
 {% endblock %}

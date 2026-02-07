@@ -11,15 +11,27 @@
     <style>
       .notes-grid {
         display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-        gap: 1rem;
+        grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+        gap: 1.25rem;
+      }
+      @media (min-width: 1200px) {
+        .notes-grid {
+          grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+        }
+      }
+      :root {
+        --notes-surface: #0f0f0f;
+        --notes-card: #1b1b1b;
+        --notes-border: rgba(255, 255, 255, 0.08);
+        --notes-faint: rgba(255, 255, 255, 0.4);
       }
       .notes-folders-panel {
-        background: #fff;
-        border: 1px solid #e4e4e4;
+        background: var(--notes-surface);
+        border: 1px solid var(--notes-border);
         border-radius: 0.5rem;
         padding: 1rem;
         margin-bottom: 1.5rem;
+        box-shadow: 0 6px 16px rgba(0, 0, 0, 0.45);
       }
       .folders-grid {
         display: grid;
@@ -28,10 +40,11 @@
         margin-top: 0.75rem;
       }
       .folder-card {
-        border: 1px solid #dcdcdc;
+        border: 1px solid var(--notes-border);
         border-radius: 0.5rem;
         padding: 0.75rem;
-        background: #fdfdfd;
+        background: var(--notes-card);
+        color: #f5f5f5;
       }
       .folder-card strong {
         display: block;
@@ -39,7 +52,7 @@
       }
       .folder-counts {
         font-size: 0.8rem;
-        color: #555;
+        color: var(--notes-faint);
         display: flex;
         gap: 0.5rem;
         flex-wrap: wrap;
@@ -60,7 +73,7 @@
         font-size: 0.65rem;
         padding: 0.2rem 0.4rem;
         border-radius: 999px;
-        background: #6c757d;
+        background: #4f4f4f;
         color: #fff;
         margin-left: 0.25rem;
       }
@@ -68,8 +81,8 @@
         font-size: 0.7rem;
         padding: 0.15rem 0.45rem;
         border-radius: 999px;
-        background: #e0e0ff;
-        color: #1c1c8c;
+        background: #2a2a40;
+        color: #aacfef;
         margin-left: 0.35rem;
       }
       .notes-section-heading {
@@ -92,7 +105,7 @@
       }
       .notes-archived-hint {
         font-size: 0.85rem;
-        color: #6c757d;
+        color: var(--notes-faint);
       }
     </style>
 
@@ -135,7 +148,7 @@
       {% endif %}
     </section>
 
-    <section class="notes-form-card">
+    <section class="notes-form-card" style="background: var(--notes-card); border: 1px solid var(--notes-border); border-radius:0.75rem; padding:1rem; margin-bottom:1.5rem;">
       <form method="post" enctype="multipart/form-data" novalidate id="admin-note-form">
         {% csrf_token %}
         {{ form.non_field_errors }}

@@ -15,6 +15,7 @@ urlpatterns = [
         name="scheduled_design_preview",
     ),
     path("runway/", views.runway_status, name="runway_status"),
+    path("idea-dump/", views.idea_dump, name="idea_dump"),
     path("sops/", views.sop_library, name="sop_library"),
     path("create/", views.create_task, name="create_task"),
     path("task/<int:task_id>/", views.task_detail, name="task_detail"),

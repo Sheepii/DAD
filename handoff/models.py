@@ -402,6 +402,11 @@ class TaskPublication(models.Model):
     store = models.ForeignKey(Store, on_delete=models.CASCADE, related_name="publications")
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default=STATUS_QUEUED)
     listing_url = models.URLField(blank=True)
+    etsy_description = models.TextField(
+        blank=True,
+        default="",
+        help_text="Optional Etsy description text scoped to this store.",
+    )
     listed_at = models.DateTimeField(null=True, blank=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -578,6 +583,27 @@ class DesignHistory(models.Model):
 
     def __str__(self) -> str:
         return f"{self.design_file or 'Design'} - {self.posted_date}"
+
+
+class IdeaDump(models.Model):
+    title = models.CharField(max_length=200)
+    notes = models.TextField(blank=True)
+    image = models.ImageField(upload_to="idea_dump/", blank=True, null=True)
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="idea_dumps",
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+
+    def __str__(self) -> str:
+        return self.title or "Idea dump entry"
 
 
 class SOPGuide(models.Model):

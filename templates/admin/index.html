@@ -5,47 +5,149 @@
   {{ block.super }}
   <link rel="stylesheet" href="{% static "admin/css/dashboard.css" %}">
   <style>
-    .admin-notes-module {
-      margin-bottom: 1rem;
-      padding: 0.75rem;
+    :root {
+      --dad-bg-deep: #040404;
+      --dad-panel: rgba(12, 12, 12, 0.85);
+      --dad-border: rgba(255, 255, 255, 0.07);
+      --dad-accent: #59a8ff;
+      --dad-muted: rgba(255, 255, 255, 0.65);
     }
-    .admin-notes-module h2 {
-      font-size: 1rem;
+    body {
+      background: linear-gradient(180deg, rgba(15, 34, 92, 0.85), rgba(0, 0, 0, 0.95)) fixed;
+      color: #fff;
+    }
+    #content-main {
+      max-width: 1200px;
+      margin: 1.5rem auto;
+      display: grid;
+      grid-template-columns: minmax(0, 3fr) minmax(280px, 2fr);
+      gap: 1.5rem;
+    }
+    .app-list {
+      background: var(--dad-panel);
+      border-radius: 1.25rem;
+      padding: 1.5rem;
+      border: 1px solid var(--dad-border);
+      box-shadow: 0 20px 45px rgba(0, 0, 0, 0.65);
+    }
+    .app-list h1 {
       margin-top: 0;
-      margin-bottom: 0.5rem;
+      font-size: 1.8rem;
+      letter-spacing: 0.04em;
+    }
+    .app-list li {
+      border-radius: 0.75rem;
+      border: 1px solid rgba(255, 255, 255, 0.05);
+      background: rgba(255, 255, 255, 0.015);
+      margin-bottom: 0.6rem;
+      padding: 0.75rem 1rem;
+    }
+    .app-list li:last-child {
+      margin-bottom: 0;
+    }
+    .app-list a {
+      color: #fff;
+      font-size: 1rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .app-list a:hover {
+      color: var(--dad-accent);
+    }
+    #content-related {
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+    }
+    .module-card {
+      background: var(--dad-panel);
+      border-radius: 1rem;
+      padding: 1.25rem;
+      border: 1px solid var(--dad-border);
+      box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.02);
+    }
+    .module-card h2 {
+      margin-top: 0;
+      font-size: 1.25rem;
     }
     .admin-notes-module form {
       display: flex;
       flex-direction: column;
-      gap: 0.25rem;
-      padding-bottom: 0.5rem;
-      border-bottom: 1px solid #ddd;
-      margin-bottom: 0.5rem;
+      gap: 0.5rem;
+    }
+    .admin-notes-module label {
+      display: flex;
+      flex-direction: column;
+      font-size: 0.85rem;
+      color: var(--dad-muted);
+      gap: 0.3rem;
+    }
+    .admin-notes-module input,
+    .admin-notes-module textarea,
+    .admin-notes-module select {
+      border-radius: 0.6rem;
+      border: 1px solid var(--dad-border);
+      padding: 0.6rem;
+      background: rgba(0, 0, 0, 0.45);
+      color: #fff;
+      font-size: 0.95rem;
     }
     .admin-notes-module textarea {
-      resize: vertical;
-      min-height: 4.5rem;
+      min-height: 120px;
     }
-    .admin-notes-module .recent-notes-list {
-      margin: 0;
-      padding: 0;
+    .admin-notes-module button {
+      align-self: flex-start;
+      background: transparent;
+      border: 1px solid var(--dad-accent);
+      color: var(--dad-accent);
+      padding: 0.5rem 1.2rem;
+      border-radius: 999px;
+      font-size: 0.9rem;
+      transition: background 0.2s ease, color 0.2s ease;
+    }
+    .admin-notes-module button:hover {
+      background: var(--dad-accent);
+      color: #050505;
+    }
+    .recent-notes-list {
       list-style: none;
+      margin: 1rem 0 0;
+      padding: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 0.6rem;
     }
-    .admin-notes-module .recent-notes-list li {
-      margin-bottom: 0.5rem;
+    .recent-notes-list li {
+      background: rgba(255, 255, 255, 0.02);
+      border-radius: 0.75rem;
+      padding: 0.65rem 0.85rem;
+      border: 1px solid rgba(255, 255, 255, 0.04);
     }
-    .admin-notes-module .recent-notes-list li .note-summary {
-      margin: 0;
-      line-height: 1.3;
-    }
-    .admin-notes-module .recent-notes-list li .note-meta {
-      font-size: 0.75rem;
-      color: #555;
-    }
-    .admin-notes-module .note-link {
-      font-size: 0.75rem;
+    .recent-notes-list strong {
       display: block;
-      margin-top: 0.5rem;
+      font-size: 1rem;
+    }
+    .recent-notes-list p {
+      margin: 0.25rem 0 0;
+      color: var(--dad-muted);
+      font-size: 0.85rem;
+    }
+    .note-link {
+      color: var(--dad-accent);
+      font-size: 0.85rem;
+      margin-top: 0.4rem;
+      display: inline-flex;
+      align-items: center;
+      gap: 0.35rem;
+    }
+    .recent-actions-fold summary {
+      color: #fff;
+    }
+    @media (max-width: 1100px) {
+      #content-main {
+        grid-template-columns: 1fr;
+      }
     }
   </style>
 {% endblock %}
@@ -59,83 +161,84 @@
 {% block nav-sidebar %}{% endblock %}
 
 {% block content %}
-<div id="content-main" class="app-list">
-  {% include "admin/app_list.html" with app_list=app_list show_changelinks=True %}
-</div>
-{% endblock %}
-
-{% block sidebar %}
-<div id="content-related">
-  {% if admin_notes_quick_form %}
-    <section class="module admin-notes-module">
-      <h2>Notes</h2>
-      <form method="post" action="{% url 'admin:handoff_notes' %}">
-        {% csrf_token %}
-        {{ admin_notes_quick_form.non_field_errors }}
-        <input type="hidden" name="next" value="{{ request.path }}">
-        <div class="mb-2">
-          {{ admin_notes_quick_form.title.label_tag }}
-          {{ admin_notes_quick_form.title }}
-        </div>
-        <div class="mb-2">
-          {{ admin_notes_quick_form.body.label_tag }}
-          {{ admin_notes_quick_form.body }}
-        </div>
-        <div class="mb-2">
-          {{ admin_notes_quick_form.folder.label_tag }}
-          {{ admin_notes_quick_form.folder }}
-        </div>
-        <button type="submit" class="default">Save note</button>
-        <p class="mini">Add images on the full notes page.</p>
-      </form>
-      <ul class="recent-notes-list">
-        {% for note in admin_notes_recent %}
-          <li>
-            <strong>{{ note.title|default:"Untitled note" }}</strong>
-            <div class="note-meta">
-              {{ note.created_at|date:"M d, Y" }}{% if note.author %} · {{ note.author.get_username }}{% endif %}
-            </div>
-            <p class="note-summary">
-              {{ note.body|striptags|truncatechars:90 }}
-            </p>
-          </li>
-        {% empty %}
-          <li class="note-meta">{% translate "No notes yet." %}</li>
-        {% endfor %}
-      </ul>
-      <a class="note-link" href="{% url 'admin:handoff_notes' %}">{% translate "View all notes" %}</a>
-    </section>
-  {% endif %}
-  <details class="module recent-actions-fold" id="recent-actions-module">
-    <summary>
-      <span>{% translate 'Recent actions' %}</span>
-    </summary>
-    <div class="recent-actions-body">
-      <h3>{% translate 'My actions' %}</h3>
-      {% get_admin_log 10 as admin_log for_user user %}
-      {% if not admin_log %}
-        <p>{% translate 'None available' %}</p>
-      {% else %}
-        <ul class="actionlist">
-          {% for entry in admin_log %}
-            <li class="{% if entry.is_addition %}addlink{% endif %}{% if entry.is_change %}changelink{% endif %}{% if entry.is_deletion %}deletelink{% endif %}">
-              <span class="visually-hidden">{% if entry.is_addition %}{% translate 'Added:' %}{% elif entry.is_change %}{% translate 'Changed:' %}{% elif entry.is_deletion %}{% translate 'Deleted:' %}{% endif %}</span>
-              {% if entry.is_deletion or not entry.get_admin_url %}
-                {{ entry.object_repr }}
-              {% else %}
-                <a href="{{ entry.get_admin_url }}">{{ entry.object_repr }}</a>
-              {% endif %}
-              <br>
-              {% if entry.content_type %}
-                <span class="mini quiet">{% filter capfirst %}{{ entry.content_type.name }}{% endfilter %}</span>
-              {% else %}
-                <span class="mini quiet">{% translate 'Unknown content' %}</span>
-              {% endif %}
+<div id="content-main">
+  <div class="app-list">
+    {% include "admin/app_list.html" with app_list=app_list show_changelinks=True %}
+  </div>
+  <div id="content-related">
+    {% if admin_notes_quick_form %}
+      <section class="module admin-notes-module">
+        <div class="module-card">
+          <h2>Quick notes</h2>
+          <form method="post" action="{% url 'admin:handoff_notes' %}">
+            {% csrf_token %}
+            {{ admin_notes_quick_form.non_field_errors }}
+            <input type="hidden" name="next" value="{{ request.path }}">
+            <label>
+              {{ admin_notes_quick_form.title.label_tag }}
+              {{ admin_notes_quick_form.title }}
+            </label>
+            <label>
+              {{ admin_notes_quick_form.body.label_tag }}
+              {{ admin_notes_quick_form.body }}
+            </label>
+            <label>
+              {{ admin_notes_quick_form.folder.label_tag }}
+              {{ admin_notes_quick_form.folder }}
+            </label>
+            <button type="submit">Save note</button>
+            <p class="mini">Images and folders can be added on the full notes page.</p>
+          </form>
+        <ul class="recent-notes-list">
+          {% for note in admin_notes_recent %}
+            <li>
+              <strong>{{ note.title|default:"Untitled note" }}</strong>
+              <p>
+                {{ note.created_at|date:"M d, Y" }}{% if note.author %} · {{ note.author.get_username }}{% endif %}
+              </p>
+              <p>{{ note.body|striptags|truncatechars:110 }}</p>
             </li>
+          {% empty %}
+            <li class="note-meta">{% translate "No notes yet." %}</li>
           {% endfor %}
         </ul>
-      {% endif %}
-    </div>
-  </details>
+        <a class="note-link" href="{% url 'admin:handoff_notes' %}">{% translate "View all notes" %} →</a>
+      </div>
+      </section>
+    {% endif %}
+    <section class="module-card">
+      <details class="module recent-actions-fold" id="recent-actions-module">
+        <summary>
+          <span>{% translate 'Recent actions' %}</span>
+        </summary>
+        <div class="recent-actions-body">
+          <h3>{% translate 'My actions' %}</h3>
+          {% get_admin_log 10 as admin_log for_user user %}
+          {% if not admin_log %}
+            <p>{% translate 'None available' %}</p>
+          {% else %}
+            <ul class="actionlist">
+              {% for entry in admin_log %}
+                <li class="{% if entry.is_addition %}addlink{% endif %}{% if entry.is_change %}changelink{% endif %}{% if entry.is_deletion %}deletelink{% endif %}">
+                  <span class="visually-hidden">{% if entry.is_addition %}{% translate 'Added:' %}{% elif entry.is_change %}{% translate 'Changed:' %}{% elif entry.is_deletion %}{% translate 'Deleted:' %}{% endif %}</span>
+                  {% if entry.is_deletion or not entry.get_admin_url %}
+                    {{ entry.object_repr }}
+                  {% else %}
+                    <a href="{{ entry.get_admin_url }}">{{ entry.object_repr }}</a>
+                  {% endif %}
+                  <br>
+                  {% if entry.content_type %}
+                    <span class="mini quiet">{% filter capfirst %}{{ entry.content_type.name }}{% endfilter %}</span>
+                  {% else %}
+                    <span class="mini quiet">{% translate 'Unknown content' %}</span>
+                  {% endif %}
+                </li>
+              {% endfor %}
+            </ul>
+          {% endif %}
+        </div>
+      </details>
+    </section>
+  </div>
 </div>
 {% endblock %}

@@ -49,6 +49,7 @@ from .models import (
     TaskStep,
     TaskTemplate,
     TemplateAttachment,
+    IdeaDump,
     extract_drive_id,
 )
 from .drive import (
@@ -711,6 +712,8 @@ class MockupSlotInline(admin.TabularInline):
 class TaskPublicationInline(admin.TabularInline):
     model = TaskPublication
     extra = 0
+    fields = ("store", "status", "listing_url", "etsy_description", "listed_at")
+    readonly_fields = ("store",)
 
 
 @admin.register(Task)
@@ -1155,6 +1158,16 @@ class StoreMembershipAdmin(admin.ModelAdmin):
 @admin.register(TaskPublication)
 class TaskPublicationAdmin(admin.ModelAdmin):
     list_display = ("task", "store", "status", "listed_at", "updated_at")
+    fields = ("task", "store", "status", "listing_url", "etsy_description", "listed_at")
+    readonly_fields = ("task", "store")
     list_filter = ("status", "store")
     search_fields = ("task__title", "store__name", "listing_url")
     autocomplete_fields = ("task", "store")
+
+
+@admin.register(IdeaDump)
+class IdeaDumpAdmin(admin.ModelAdmin):
+    list_display = ("title", "created_by", "created_at")
+    list_filter = ("created_by",)
+    search_fields = ("title", "notes")
+    readonly_fields = ("created_at", "updated_at")

@@ -34,7 +34,7 @@ from .context_processors import (
     _compute_runway_status,
     _match_active_sop,
 )
-from .forms import TaskCreateForm
+from .forms import TaskCreateForm, IdeaDumpForm
 from .mockup_generator import convert_svg_bytes, preview_mockup_for_template
 from .mockup_service import (
     get_mockup_job,
@@ -55,12 +55,35 @@ from .models import (
     Task,
     TaskPublication,
     TaskStep,
+    IdeaDump,
 )
 from .design_workflow import ensure_emergency_design
 
 
 def home(request):
     return redirect("handoff:today")
+
+
+@login_required
+def idea_dump(request):
+    form = IdeaDumpForm(request.POST or None, request.FILES or None)
+    if form.is_valid():
+        idea = form.save(commit=False)
+        idea.created_by = request.user
+        idea.save()
+        messages.success(request, "Idea saved to the design dump.")
+        return redirect("handoff:idea_dump")
+    ideas = list(
+        IdeaDump.objects.select_related("created_by").order_by("-created_at")[:60]
+    )
+    return render(
+        request,
+        "handoff/idea_dump.html",
+        {
+            "form": form,
+            "ideas": ideas,
+        },
+    )
 
 
 def _get_user_stores(request):
@@ -83,6 +106,16 @@ def _get_store_from_request(request):
     try:
         return stores.get(pk=int(store_id))
     except (Store.DoesNotExist, ValueError):
+        return None
+
+
+def _get_store_by_id(request, store_id):
+    if not store_id:
+        return None
+    stores = _get_user_stores(request)
+    try:
+        return stores.get(pk=int(store_id))
+    except (Store.DoesNotExist, ValueError, TypeError):
         return None
 
 
@@ -604,10 +637,15 @@ def etsy_listing_preview(request, task_id: int):
         task.save(update_fields=updated_fields + ["updated_at"])
 
     task.ensure_publications()
-    publications = (
+    publications = list(
         task.publications.select_related("store")
         .order_by("store__order", "store__name", "id")
     )
+    description_by_store = {
+        str(pub.store_id): pub.etsy_description or ""
+        for pub in publications
+    }
+    selected_store_id = store.id if store else (publications[0].store_id if publications else None)
     context = _build_mockup_context(task)
     context["task"] = task
     etsy_photos = []
@@ -652,6 +690,8 @@ def etsy_listing_preview(request, task_id: int):
     context["product_suffix"] = task.template.etsy_title_suffix if task.template_id else ""
     context["publications"] = publications
     context["store"] = store
+    context["description_by_store"] = description_by_store
+    context["selected_store_id"] = selected_store_id
     sops = list(SOPGuide.objects.filter(active=True).order_by("name", "id"))
     if sops:
         active_sop = _match_active_sop(request.path)
@@ -683,6 +723,7 @@ def etsy_listing_preview(request, task_id: int):
 def etsy_listing_save(request, task_id: int):
     task = get_object_or_404(Task, pk=task_id)
     content_type = request.headers.get("Content-Type", "")
+    store_id_value = None
     if "application/json" in content_type:
         try:
             payload = json.loads(request.body.decode("utf-8"))
@@ -691,10 +732,12 @@ def etsy_listing_save(request, task_id: int):
         title = str(payload.get("title") or "").strip()
         description = str(payload.get("description") or "").strip()
         tags_csv = str(payload.get("tags") or "").strip()
+        store_id_value = payload.get("store_id")
     else:
         title = str(request.POST.get("title") or "").strip()
         description = str(request.POST.get("description") or "").strip()
         tags_csv = str(request.POST.get("tags") or "").strip()
+        store_id_value = request.POST.get("store_id")
 
     clear_tags = not tags_csv
     tags = normalize_tags_csv(tags_csv)
@@ -714,9 +757,19 @@ def etsy_listing_save(request, task_id: int):
     if title != task.etsy_title:
         task.etsy_title = title
         updated.append("etsy_title")
-    if description != task.etsy_description:
-        task.etsy_description = description
-        updated.append("etsy_description")
+    store = _get_store_by_id(request, store_id_value)
+    publication_description = None
+    if store:
+        task.ensure_publications()
+        pub, _ = TaskPublication.objects.get_or_create(task=task, store=store)
+        if description != (pub.etsy_description or ""):
+            pub.etsy_description = description
+            pub.save(update_fields=["etsy_description", "updated_at"])
+        publication_description = pub.etsy_description
+    else:
+        if description != task.etsy_description:
+            task.etsy_description = description
+            updated.append("etsy_description")
     if clear_tags and task.etsy_tags:
         task.etsy_tags = None
         updated.append("etsy_tags")
@@ -727,15 +780,17 @@ def etsy_listing_save(request, task_id: int):
     if updated:
         task.save(update_fields=updated + ["updated_at"])
 
-    return JsonResponse(
-        {
-            "ok": True,
-            "etsy_title": task.etsy_title,
-            "etsy_description": task.etsy_description,
-            "etsy_tags": task.etsy_tags or [],
-            "normalized": format_tags_csv(task.etsy_tags or []),
-        }
-    )
+    response_payload = {
+        "ok": True,
+        "etsy_title": task.etsy_title,
+        "etsy_description": task.etsy_description,
+        "etsy_tags": task.etsy_tags or [],
+        "normalized": format_tags_csv(task.etsy_tags or []),
+    }
+    if store:
+        response_payload["store_id"] = store.id
+        response_payload["store_description"] = publication_description
+    return JsonResponse(response_payload)
 
 
 @login_required

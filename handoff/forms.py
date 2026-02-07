@@ -13,6 +13,7 @@ from .models import (
     Task,
     TaskTemplate,
     TemplateAttachment,
+    IdeaDump,
     extract_drive_id,
 )
 
@@ -245,6 +246,31 @@ class TemplateAttachmentForm(forms.ModelForm):
         if not re.match(r"^[A-Za-z0-9_-]{15,}$", value):
             raise forms.ValidationError("Enter a valid Google Drive file ID or upload a file.")
         return value
+
+
+class IdeaDumpForm(forms.ModelForm):
+    class Meta:
+        model = IdeaDump
+        fields = ["title", "notes", "image"]
+        widgets = {
+            "title": forms.TextInput(
+                attrs={"class": "form-control", "placeholder": "Short title or prompt"}
+            ),
+            "notes": forms.Textarea(
+                attrs={
+                    "class": "form-control",
+                    "rows": 4,
+                    "placeholder": "Optional notes, keywords, or mood descriptions",
+                }
+            ),
+            "image": forms.ClearableFileInput(
+                attrs={"class": "form-control", "accept": "image/*", "id": "id_image"}
+            ),
+        }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields["title"].required = True
 
 
 class AdminNoteForm(forms.ModelForm):
