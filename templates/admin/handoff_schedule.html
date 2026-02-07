@@ -134,15 +134,15 @@
         {% endif %}
         <button class="button" type="submit">Run Intake</button>
       </form>
-      {% if selected_store %}
-        <a class="button" href="{% url 'admin:handoff_open_dump_folder' %}?store={{ selected_store.id }}" target="_blank" rel="noopener noreferrer">
-          Open {{ selected_store.name }} Dump Folder
-        </a>
-      {% else %}
-        <a class="button disabled" href="#" onclick="return false;" title="Select a store first">
-          Open Store Dump Folder
-        </a>
-      {% endif %}
+      <a
+        class="button"
+        href="{% url 'admin:handoff_open_dump_folder' %}{% if selected_store %}?store={{ selected_store.id }}{% endif %}"
+        target="_blank"
+        rel="noopener noreferrer"
+        title="{% if selected_store %}Open {{ selected_store.name }} dump folder{% else %}Open the shared dump zone{% endif %}"
+      >
+        Open{% if selected_store %} {{ selected_store.name }}{% endif %} Dump Folder
+      </a>
       <div class="schedule-more">
         <details>
           <summary class="button">More Actions</summary>
