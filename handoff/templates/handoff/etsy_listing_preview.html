@@ -911,5 +911,5 @@
   {{ listing_title|default:""|json_script:"default-title" }}
   {{ listing_description|default:""|json_script:"default-desc" }}
   {{ listing_tags|default:""|json_script:"default-tags" }}
-  {{ description_by_store|default:{}|json_script:"store-description-data" }}
+  {{ description_by_store|json_script:"store-description-data" }}
 {% endblock %}
