@@ -5,6 +5,15 @@ cd /d "%~dp0"
 echo Working folder: %cd%
 echo.
 
+for /f %%B in ('git branch --show-current') do set CURRENT_BRANCH=%%B
+if "%CURRENT_BRANCH%"=="" (
+    echo ERROR: Could not determine current branch.
+    goto :git_error
+)
+echo Current branch: %CURRENT_BRANCH%
+echo Deploy target: origin/main
+echo.
+
 set /p COMMIT_MSG=Commit message: 
 if "%COMMIT_MSG%"=="" (
     echo Commit cancelled: no message entered.
@@ -33,8 +42,8 @@ if "%STATUS_SIZE%"=="0" (
 del "%TEMP%\dad_git_status.tmp" >nul 2>nul
 
 :push_step
-echo Pushing to origin/main...
-git push origin main
+echo Pushing current HEAD to origin/main...
+git push origin HEAD:main
 if errorlevel 1 goto :git_error
 
 echo.

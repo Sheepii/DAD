@@ -4,23 +4,26 @@
 from __future__ import annotations
 
 import os
+import subprocess
 import sys
-from pathlib import Path
 
 import manage
+
+
+def _get_waitress_serve():
+    try:
+        from waitress import serve
+    except ImportError:
+        # Fallback for environments where requirements are stale on disk.
+        subprocess.check_call([sys.executable, "-m", "pip", "install", "waitress==2.1.0"])
+        from waitress import serve
+    return serve
 
 
 def main() -> None:
     manage.ensure_requirements()
     os.environ.setdefault("DJANGO_SETTINGS_MODULE", "dad.settings")
-
-    try:
-        from waitress import serve
-    except ImportError as exc:
-        raise RuntimeError(
-            "waitress is required for the production server. "
-            "Install dependencies via `pip install -r requirements.txt`."
-        ) from exc
+    serve = _get_waitress_serve()
 
     from dad.wsgi import application
 
