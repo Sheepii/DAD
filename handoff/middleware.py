@@ -1,5 +1,7 @@
 import logging
 
+from django.core.exceptions import DisallowedHost
+
 logger = logging.getLogger("handoff.proxy-headers")
 
 
@@ -13,9 +15,13 @@ class ProxyHeaderLoggingMiddleware:
         forwarded_proto = request.META.get("HTTP_X_FORWARDED_PROTO")
         forwarded_host = request.META.get("HTTP_X_FORWARDED_HOST")
         raw_host = request.META.get("HTTP_HOST")
+        try:
+            resolved_host = request.get_host()
+        except DisallowedHost:
+            resolved_host = "<disallowed>"
         logger.info(
             "Proxy headers: get_host=%s raw_host=%s scheme=%s secure=%s X_FORWARDED_PROTO=%s X_FORWARDED_HOST=%s",
-            request.get_host(),
+            resolved_host,
             raw_host,
             request.scheme,
             request.is_secure(),

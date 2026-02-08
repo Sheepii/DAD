@@ -29,7 +29,13 @@ SECRET_KEY = os.environ.get(
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = os.environ.get("DEBUG", "true").lower() == "true"
 
-ALLOWED_HOSTS = ["192.168.0.11", "127.0.0.1", "localhost"]
+ALLOWED_HOSTS = [
+    "192.168.0.11",
+    "127.0.0.1",
+    "localhost",
+    "mockups.pro",
+    "www.mockups.pro",
+]
 _env_hosts = os.environ.get("DJANGO_ALLOWED_HOSTS") or os.environ.get("ALLOWED_HOSTS")
 if _env_hosts:
     ALLOWED_HOSTS = [h.strip() for h in _env_hosts.split(",") if h.strip()]
