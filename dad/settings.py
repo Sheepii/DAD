@@ -34,6 +34,8 @@ _env_hosts = os.environ.get("DJANGO_ALLOWED_HOSTS") or os.environ.get("ALLOWED_H
 if _env_hosts:
     ALLOWED_HOSTS = [h.strip() for h in _env_hosts.split(",") if h.strip()]
 
+SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
+
 
 # Application definition
 
