@@ -35,6 +35,7 @@ if _env_hosts:
     ALLOWED_HOSTS = [h.strip() for h in _env_hosts.split(",") if h.strip()]
 
 SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
+USE_X_FORWARDED_HOST = True
 
 
 # Application definition
