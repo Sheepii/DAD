@@ -17,6 +17,28 @@ Open:
 - `http://127.0.0.1:8080/create/` for quick task creation
 - `http://127.0.0.1:8080/task/<id>/etsy/` for an Etsy listing preview (copy/paste + tag tools)
 
+## Production server (IIS/ARR or Linux)
+
+If IIS/ARR is terminating TLS, stop using `manage.py runserver`; instead host Django behind a WSGI/ASGI server that IIS can reverse-proxy to.
+
+1. Install dependencies once more to pull the production server. `gunicorn` is already listed for Linux deployments, and Windows installations can use Waitress:
+   ```powershell
+   .\.venv\Scripts\python -m pip install -r requirements.txt
+   ```
+2. IIS/ARR should forward `X-Forwarded-Proto`/`X-Forwarded-Host` to the backend and point to `127.0.0.1:8000` (or another port you choose).
+3. On Windows, run the new helper that launches Waitress, which is production-ready and happily serves behind ARR:
+   ```powershell
+   .\.venv\Scripts\python run_prod_server.py
+   ```
+   Override `PROD_HOST`/`PROD_PORT` if ARR targets a different address/port.
+4. On Linux or containers you can run Gunicorn directly:
+   ```bash
+   gunicorn dad.wsgi:application --bind 127.0.0.1:8000 --workers 3
+   ```
+5. Because `SECURE_PROXY_SSL_HEADER` is set, Django trusts the proxy headers and will generate HTTPS redirects and `request.is_secure()` correctly.
+
+Watch the console for `Proxy headers: ...` logs if you need to confirm which scheme and host Django reports while the proxy is active.
+
 ## Deploy on Koyeb (with Postgres)
 
 Koyeb’s filesystem is ephemeral, so SQLite will be wiped on restarts. Use Postgres.
