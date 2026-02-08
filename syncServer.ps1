@@ -26,7 +26,7 @@ try {
     Invoke-NativeOrFail -CommandLabel "pip install waitress" -Command { .\.venv\Scripts\python -m pip install waitress==2.1.0 }
 
     Write-Host "Verifying waitress import..."
-    Invoke-NativeOrFail -CommandLabel "waitress import check" -Command { .\.venv\Scripts\python -c "import waitress; print(waitress.__version__)" }
+    Invoke-NativeOrFail -CommandLabel "waitress import check" -Command { .\.venv\Scripts\python -c "import waitress; import importlib.metadata as m; print('waitress', m.version('waitress'))" }
 
     # TODO: restart your server process here if needed (e.g., stop/start or service restart).
     Write-Host "Sync completed successfully." -ForegroundColor Green
