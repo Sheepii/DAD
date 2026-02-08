@@ -38,7 +38,9 @@ ALLOWED_HOSTS = [
 ]
 _env_hosts = os.environ.get("DJANGO_ALLOWED_HOSTS") or os.environ.get("ALLOWED_HOSTS")
 if _env_hosts:
-    ALLOWED_HOSTS = [h.strip() for h in _env_hosts.split(",") if h.strip()]
+    for host in [h.strip() for h in _env_hosts.split(",") if h.strip()]:
+        if host not in ALLOWED_HOSTS:
+            ALLOWED_HOSTS.append(host)
 
 SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
 USE_X_FORWARDED_HOST = True
